@@ -202,10 +202,7 @@ function renderRound() {
   $('excluded-notice').hidden = !excluded && !pending
   $('excluded-notice').textContent = pending ? 'Exclu à choisir' : excluded ? `Exclu : joueur ${excluded}` : ''
   const tables = Object.values(plan.rotations)[round]
-  $('table-cards').innerHTML = tables.map(table => {
-    const seatHtml = (player, index) => `<div class="seat ${['north', 'south', 'east', 'west'][index] || ''} ${player?.id ? '' : 'empty'}"><small>${seats[index]}</small><strong>${player ? player.id || 'Mort' : '—'}</strong></div>`
-    return `<article class="table-card"><h3>Table ${table.table}</h3><div class="table-layout">${[0, 1, 2, 3].map(index => seatHtml(table.joueurs[index], index)).join('')}<span class="table-center" aria-hidden="true">♠</span></div>${table.joueurs.length > 4 ? `<div class="extra-seats">${table.joueurs.slice(4).map((player, index) => seatHtml(player, index + 4)).join('')}</div>` : ''}</article>`
-  }).join('')
+  buildDrawTables(tables, $('table-cards'))
 }
 
 function selectView(nextView) {
@@ -251,7 +248,7 @@ function buildDrawTables(tables, container) {
   container.replaceChildren()
   for (const table of tables) {
     const card = document.createElement('article'); card.className = 'table-card'
-    const title = document.createElement('h3'); title.textContent = `Table ${table.table}`
+    card.setAttribute('aria-label', `Table ${table.table}`)
     const layout = document.createElement('div'); layout.className = 'table-layout'
     const extras = document.createElement('div'); extras.className = 'extra-seats'
     for (const [index, player] of table.joueurs.entries()) {
@@ -262,7 +259,11 @@ function buildDrawTables(tables, container) {
       if (player.id !== null) { seat.dataset.slot = `${table.table}:${index}`; token.dataset.player = player.id }
       seat.append(label, token); (index < 4 ? layout : extras).append(seat)
     }
-    card.append(title, layout)
+    const center = document.createElement('span'); center.className = 'table-center'; center.setAttribute('aria-hidden', 'true')
+    const spade = document.createElement('span'); spade.className = 'table-spade'; spade.textContent = '♠'
+    const number = document.createElement('span'); number.className = 'table-number'; number.textContent = table.table
+    center.append(spade, number); layout.append(center)
+    card.append(layout)
     if (extras.children.length) card.append(extras)
     container.append(card)
   }
