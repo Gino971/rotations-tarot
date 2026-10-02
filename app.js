@@ -1,4 +1,4 @@
-import { optionsFor, maxRounds, createPlan, positionsFor, seats } from './engine.js'
+import { optionsFor, maxRounds, movementNotice, createPlan, positionsFor, seats } from './engine.js'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -34,6 +34,7 @@ function updateOptions() {
   $('rounds').replaceChildren()
   for (let i = 1; i <= limit; i++) $('rounds').add(new Option(`${i} manche${i > 1 ? 's' : ''}`, i))
   $('rounds').value = String(Math.min(old, limit))
+  $('movement-info').textContent = movementNotice(count, mode)
   renderExclusionSelectors()
 }
 

@@ -1,4 +1,4 @@
-import { calculRotationsRainbow, computeActiveFromBase } from './movements.js'
+import { calculRotationsRainbow, computeActiveFromBase, getMovementInfo } from './movements.js'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -32,6 +32,19 @@ export function maxRounds(count, mode) {
   if (mode === 'excluded' || (mode === 'mixed' && count === 6)) return 7
   const base = initialPlayers(count, mode)
   return Object.keys(calculRotationsRainbow(base, 7)).length
+}
+
+export function movementNotice(count, mode) {
+  // Manual exclusions rebuild each round independently, so the limits
+  // of an automatic movement do not apply to this mode.
+  if (mode === 'excluded') return 'Mouvement spécial · exclu choisi à chaque manche'
+  if (mode === 'mixed') return 'Mouvement spécial · rotation Club'
+  const tables = mode === 'morts' ? Math.ceil(count / 4) : count / 4
+  const info = getMovementInfo(tables)
+  let text = tables === 3 || tables === 4 ? 'Mouvement Howell' : info.label === 'Mouvement spécial FFT' ? 'Mouvement spécial' : 'Rotations normales'
+  const limit = maxRounds(count, mode)
+  if (limit < 7) text += ` · ${limit} manches maximum`
+  return text
 }
 
 export function createPlan(count, rounds, mode, exclusions = []) {

@@ -5,3 +5,5 @@
 .topbar h1{margin:0;font-size:22px;line-height:1;letter-spacing:-.5px}.topbar a{font-weight:650}main{padding-top:24px}.panel{max-width:none}.mode-option{padding:12px}.panel fieldset{margin-bottom:0}.result-controls{margin-top:24px}.search{margin-bottom:18px}
 
 .search{text-align:center}.search input{text-align:center;appearance:textfield}.search input::-webkit-inner-spin-button,.search input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.player-card-header{justify-content:center}.destination{display:grid;grid-template-columns:8ch 10ch;gap:9px;white-space:nowrap;font-variant-numeric:tabular-nums}.seat-badge{min-width:0;width:100%}
+
+.movement-info{margin:16px 0 0;font-size:13px}
