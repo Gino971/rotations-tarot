@@ -241,16 +241,44 @@ function renderDrawOrder() {
     message.textContent = 'Tirage enregistré. Choisissez l’exclu de la première manche pour afficher les places.'
     container.append(message); return
   }
-  for (const table of tables) {
-    const row = document.createElement('div'); row.className = 'draw-table'
-    const title = document.createElement('strong'); title.textContent = `Table ${table.table}`
-    const order = document.createElement('p')
-    order.textContent = table.joueurs.map((player, index) => `${seats[index]} : ${player.id === null ? 'Mort' : `J${player.id}`}`).join(' · ')
-    row.append(title, order); container.append(row)
-  }
+  buildDrawTables(tables, container)
   if (plan.excluded[0]) {
     const excluded = document.createElement('p'); excluded.textContent = `Exclu : joueur ${plan.excluded[0]}`; container.append(excluded)
   }
+}
+
+function buildDrawTables(tables, container) {
+  container.replaceChildren()
+  for (const table of tables) {
+    const card = document.createElement('article'); card.className = 'table-card'
+    const title = document.createElement('h3'); title.textContent = `Table ${table.table}`
+    const layout = document.createElement('div'); layout.className = 'table-layout'
+    const extras = document.createElement('div'); extras.className = 'extra-seats'
+    for (const [index, player] of table.joueurs.entries()) {
+      const seat = document.createElement('div'); seat.className = `seat ${['north', 'south', 'east', 'west'][index] || ''}`
+      const label = document.createElement('small'); label.textContent = seats[index]
+      const token = document.createElement('strong'); token.className = 'draw-player'
+      token.textContent = player.id === null ? 'Mort' : `J${player.id}`
+      if (player.id !== null) { seat.dataset.slot = `${table.table}:${index}`; token.dataset.player = player.id }
+      seat.append(label, token); (index < 4 ? layout : extras).append(seat)
+    }
+    card.append(title, layout)
+    if (extras.children.length) card.append(extras)
+    container.append(card)
+  }
+}
+
+async function moveDrawPlayers(moves, reduced, duration) {
+  const rectangles = moves.map(([token, destination]) => {
+    const from = token.getBoundingClientRect(), to = destination.querySelector('.draw-player').getBoundingClientRect()
+    return { token, destination, dx: to.x - from.x, dy: to.y - from.y }
+  })
+  if (!reduced) await Promise.all(rectangles.map(({ token, dx, dy }) => {
+    token.classList.add('moving')
+    return token.animate([{ transform: 'translate(0, 0)' }, { transform: `translate(${dx}px, ${dy}px)` }], { duration, easing: 'ease-in-out' }).finished.catch(() => {})
+  }))
+  else await new Promise(resolve => setTimeout(resolve, duration))
+  rectangles.forEach(({ token, destination }) => { token.classList.remove('moving'); destination.append(token) })
 }
 
 function drawTone(frequency, duration = 0.05, delay = 0) {
@@ -269,6 +297,7 @@ function drawTone(frequency, duration = 0.05, delay = 0) {
 $('draw-sound').addEventListener('change', () => { if (plan) persist() })
 $('draw').addEventListener('click', async () => {
   if (drawing) return
+  if (mode === 'excluded' && !manualExclusions[0]) { $('draw-status').textContent = 'Choisissez d’abord l’exclu de la première manche.'; return }
   drawing = true
   const controls = [...$('setup-form').querySelectorAll('button, select, input')].filter(control => control.id !== 'draw-sound')
   const previous = controls.map(control => control.disabled)
@@ -285,15 +314,32 @@ $('draw').addEventListener('click', async () => {
       } catch { /* The visual draw remains available if audio is blocked. */ }
     }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const tokens = [...$('draw-animation').querySelectorAll('.draw-tokens span')]
     const count = Number($('count').value)
-    for (let step = 0; step < (reduced ? 1 : 10); step++) {
-      const values = new Uint32Array(tokens.length); crypto.getRandomValues(values)
-      tokens.forEach((token, index) => { token.textContent = `J${values[index] % count + 1}` })
-      drawTone(350 + step * 35)
-      await new Promise(resolve => setTimeout(resolve, reduced ? 250 : 130 + step * 8))
-    }
     const seed = new Uint32Array(1); crypto.getRandomValues(seed)
+    const initial = createPlan(count, 1, mode, manualExclusions)
+    const final = createPlan(count, 1, mode, manualExclusions, true, seed[0])
+    buildDrawTables(initial.rotations['Manche 1'], $('draw-tables'))
+    $('draw-stage').textContent = 'Placement initial · ordre des numéros'
+    await new Promise(resolve => setTimeout(resolve, 600))
+    $('draw-stage').textContent = 'Les joueurs échangent leurs places…'
+    const slots = [...$('draw-tables').querySelectorAll('[data-slot]')]
+    const started = performance.now()
+    while (performance.now() - started < 4500) {
+      const choices = new Uint32Array(2); crypto.getRandomValues(choices)
+      const a = choices[0] % slots.length
+      const b = (a + 1 + choices[1] % (slots.length - 1)) % slots.length
+      await moveDrawPlayers([[slots[a].querySelector('.draw-player'), slots[b]], [slots[b].querySelector('.draw-player'), slots[a]]], reduced, 180)
+      drawTone(400 + choices[0] % 300)
+      await new Promise(resolve => setTimeout(resolve, 70))
+    }
+    const tokens = new Map([...$('draw-tables').querySelectorAll('[data-player]')].map(token => [Number(token.dataset.player), token]))
+    const destinations = new Map(slots.map(slot => [slot.dataset.slot, slot]))
+    const moves = []
+    for (const table of final.rotations['Manche 1']) for (const [index, player] of table.joueurs.entries()) if (player.id !== null) {
+      const token = tokens.get(player.id), destination = destinations.get(`${table.table}:${index}`)
+      if (token.parentElement !== destination) moves.push([token, destination])
+    }
+    await moveDrawPlayers(moves, reduced, Math.max(100, 5000 - (performance.now() - started)))
     drawSeed = seed[0]
     recalculate()
     drawTone(523, 0.15); drawTone(659, 0.15, 0.12); drawTone(784, 0.24, 0.24)

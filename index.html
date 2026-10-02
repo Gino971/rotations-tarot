@@ -31,7 +31,7 @@
         <fieldset class="draw-field"><legend>Première manche</legend>
           <div class="draw-actions"><button id="draw" type="button" class="secondary">Tirer au sort</button><button id="reset-draw" type="button" class="text-button" hidden>Ordre des numéros</button></div>
           <label class="sound-option"><input id="draw-sound" type="checkbox" checked> Son du tirage</label>
-          <div id="draw-animation" class="draw-animation" hidden aria-hidden="true"><div class="draw-tokens"><span></span><span></span><span></span><span></span></div><p>Mélange des joueurs…</p></div>
+          <div id="draw-animation" class="draw-animation" hidden><p id="draw-stage" role="status">Placement initial</p><div id="draw-tables" class="table-grid draw-tables"></div></div>
           <div id="draw-result" class="draw-result" hidden><h3>Ordre de la première manche</h3><div id="draw-order"></div></div>
           <p id="draw-status" class="hint" role="status"></p>
         </fieldset>
