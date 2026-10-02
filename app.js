@@ -6,6 +6,7 @@ let plan = null
 let mode = 'normal'
 let view = 'player'
 let round = 0
+let selectedPlayer = 0
 let manualExclusions = []
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
@@ -58,24 +59,51 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, view, round }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, view, round, selectedPlayer }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
 function showPlan() {
   $('results').hidden = false
-  $('search').max = String(plan.count)
-  $('current-round').replaceChildren()
-  for (let i = 1; i <= plan.rounds; i++) $('current-round').add(new Option(`Manche ${i}`, i - 1))
   renderPlayers(); renderRound(); selectView(view); persist()
+}
+
+function renderNavigation() {
+  const playerView = view === 'player'
+  const select = $('current-placement')
+  select.replaceChildren()
+  select.setAttribute('aria-label', playerView ? 'Joueur' : 'Manche')
+  if (playerView) select.add(new Option('Tous', 0))
+  const total = playerView ? plan.count : plan.rounds
+  for (let i = 1; i <= total; i++) {
+    const option = new Option(String(i), i)
+    option.setAttribute('aria-label', `${playerView ? 'Joueur' : 'Manche'} ${i}`)
+    select.add(option)
+  }
+  select.value = String(playerView ? selectedPlayer : round + 1)
+  $('previous').setAttribute('aria-label', playerView ? 'Joueur précédent' : 'Manche précédente')
+  $('next').setAttribute('aria-label', playerView ? 'Joueur suivant' : 'Manche suivante')
+  updateNavigationButtons()
+}
+
+function updateNavigationButtons() {
+  const current = view === 'player' ? selectedPlayer : round
+  const last = view === 'player' ? plan.count : plan.rounds - 1
+  $('previous').disabled = current === 0
+  $('next').disabled = current === last
+}
+
+function changePlacement(value) {
+  if (view === 'player') { selectedPlayer = value; renderPlayers() }
+  else { round = value - 1; renderRound() }
+  $('current-placement').value = String(value)
+  updateNavigationButtons(); persist()
 }
 
 function renderPlayers() {
   $('player-cards').replaceChildren()
-  const filter = $('search').value.trim()
-  const selected = filter ? Number(filter) : null
   for (let id = 1; id <= plan.count; id++) {
-    if (selected !== null && selected !== id) continue
+    if (selectedPlayer && selectedPlayer !== id) continue
     const card = document.createElement('article'); card.className = 'player-card'
     card.innerHTML = `<h3 class="player-card-header">Joueur ${id}</h3><div class="itinerary">${positionsFor(plan, id).map((position, index) => `<div class="position-row"><span>Manche ${index + 1}</span>${position.pending ? '<span>À définir</span>' : position.excluded ? '<span class="excluded-label">Exclu</span>' : `<span class="destination">Table ${position.table}<span class="seat-badge">${position.seat}</span></span>`}</div>`).join('')}</div>`
     $('player-cards').append(card)
@@ -86,8 +114,6 @@ function renderPlayers() {
 }
 
 function renderRound() {
-  $('current-round').value = String(round)
-  $('previous').disabled = round === 0; $('next').disabled = round === plan.rounds - 1
   const excluded = plan.excluded[round]
   const pending = plan.mode === 'excluded' && excluded === null
   $('excluded-notice').hidden = !excluded && !pending
@@ -107,14 +133,14 @@ function selectView(nextView) {
     $(`by-${name}`).setAttribute('aria-selected', String(name === view))
     $(`by-${name}`).tabIndex = name === view ? 0 : -1
   }
-  if (plan) persist()
+  if (plan) { renderNavigation(); persist() }
 }
 
 function recalculate() {
   try {
     plan = createPlan(Number($('count').value), Number($('rounds').value), mode, manualExclusions)
     round = Math.min(round, plan.rounds - 1)
-    if (Number($('search').value) > plan.count) $('search').value = ''
+    if (selectedPlayer > plan.count) selectedPlayer = 0
     $('error').textContent = ''; showPlan()
   } catch (error) { $('error').textContent = error.message; $('results').hidden = true }
 }
@@ -122,15 +148,18 @@ function recalculate() {
 $('count').addEventListener('change', () => { manualExclusions = []; updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
 $('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate() })
-$('search').addEventListener('input', renderPlayers)
 $('by-player').addEventListener('click', () => selectView('player'))
 $('by-round').addEventListener('click', () => selectView('round'))
 for (const id of ['by-player', 'by-round']) $(id).addEventListener('keydown', event => {
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectView(view === 'player' ? 'round' : 'player'); $(`by-${view}`).focus() }
 })
-$('current-round').addEventListener('change', () => { round = Number($('current-round').value); renderRound(); persist() })
-$('previous').addEventListener('click', () => { if (round > 0) { round--; renderRound(); persist() } })
-$('next').addEventListener('click', () => { if (round < plan.rounds - 1) { round++; renderRound(); persist() } })
+$('current-placement').addEventListener('change', () => changePlacement(Number($('current-placement').value)))
+for (const [id, step] of [['previous', -1], ['next', 1]]) $(id).addEventListener('click', () => {
+  const value = Number($('current-placement').value) + step
+  const min = view === 'player' ? 0 : 1
+  const max = view === 'player' ? plan.count : plan.rounds
+  if (value >= min && value <= max) changePlacement(value)
+})
 updateOptions()
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey))
@@ -140,6 +169,7 @@ try {
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions)
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
     view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))
+    selectedPlayer = Number.isInteger(saved.selectedPlayer) && saved.selectedPlayer >= 0 && saved.selectedPlayer <= plan.count ? saved.selectedPlayer : 0
   }
 } catch { /* Invalid or unavailable device storage: start a new setup. */ }
 recalculate()

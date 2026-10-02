@@ -27,12 +27,14 @@
       </form>
     </section>
     <section id="results" hidden aria-label="Placements">
-      <div class="result-controls"><div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active">Par joueur</button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view">Par manche</button></div></div>
+      <div class="result-controls">
+        <div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active">Par joueur</button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view">Par manche</button></div>
+        <div class="placement-navigation"><button id="previous" class="secondary" aria-label="Joueur précédent">←</button><select id="current-placement" aria-label="Joueur"></select><button id="next" class="secondary" aria-label="Joueur suivant">→</button></div>
+      </div>
       <div id="player-view" role="tabpanel" aria-labelledby="by-player">
-        <label class="search">Joueur<input id="search" type="number" inputmode="numeric" min="1" placeholder="N°"></label>
         <div id="player-cards" class="player-grid"></div>
       </div>
-      <div id="round-view" role="tabpanel" aria-labelledby="by-round" hidden><div class="round-navigation"><button id="previous" class="secondary" aria-label="Manche précédente">←</button><label>Manche<select id="current-round"></select></label><button id="next" class="secondary" aria-label="Manche suivante">→</button></div><p id="excluded-notice" class="notice" hidden></p><div id="table-cards" class="table-grid"></div></div>
+      <div id="round-view" role="tabpanel" aria-labelledby="by-round" hidden><p id="excluded-notice" class="notice" hidden></p><div id="table-cards" class="table-grid"></div></div>
     </section>
   </main>
   <script type="module" src="app.js"></script>
