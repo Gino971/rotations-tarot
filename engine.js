@@ -1,4 +1,5 @@
 import { calculRotationsRainbow, getMovementInfo } from './movements.js'
+import { optimizeRotations } from './optimizer.js'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -39,14 +40,12 @@ export function maxRounds(count, mode) {
 }
 
 function describeMoves(text) {
-  const names = { N: 'Nord', S: 'Sud', E: 'Est', O: 'Ouest' }
+  const seats = { Nord: 'N', Sud: 'S', Est: 'E', Ouest: 'O' }
   return text.split(/[,;]\s*/).map(move => {
     const [seat, delta] = move.trim().split(/\s+/)
-    const name = names[seat] || seat
-    if (delta === 'fixe') return `${name} reste fixe`
-    const steps = Math.abs(Number(delta))
-    return `${name} ${Number(delta) > 0 ? 'avance' : 'recule'} de ${steps} table${steps > 1 ? 's' : ''}`
-  }).join('. ') + '.'
+    const short = seats[seat] || seat
+    return delta === 'fixe' ? `${short} fixe` : `${short}${Number(delta) > 0 ? '+' : ''}${Number(delta)}`
+  }).join(', ')
 }
 
 export function movementDetails(count, mode) {
@@ -57,30 +56,36 @@ export function movementDetails(count, mode) {
   const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
   if (mode === 'excluded') {
     details.label = 'Mouvement spécial · exclu manuel'
-    details.description = 'Choisissez l’exclu de chaque manche selon les résultats. Le mouvement de la manche est appliqué aux joueurs restants, dans l’ordre Nord, Sud, Est, Ouest ; l’exclu n’a pas de place.'
+    details.description = 'Exclu à choisir par manche ; l’exclu n’a pas de place.'
     return details
   }
-  if (mode === 'mixed' || tables < 3) {
+  if (mode === 'mixed' || mode === 'morts') {
+    details.label = 'Rotations équilibrées'
+    details.description = 'Passages équilibrés, rencontres répétées limitées. Voir les placements.'
+    if (mode === 'morts') details.note = 'Morts : N fixe, un par table.'
+    return details
+  }
+  if (tables < 3) {
     details.label = 'Mouvement Club'
-    details.description = 'À chaque manche, la liste des joueurs est décalée de 5 places en boucle, puis répartie entre les tables. Nord n’est pas fixe.'
+    details.description = 'Liste décalée de 5 places ; N mobile.'
   } else if (tables === 3 || tables === 4) {
     details.label = 'Mouvement spécial · Howell'
-    details.description = 'Les tables et les positions Nord, Sud, Est et Ouest suivent un plan différent à chaque manche. Nord n’est pas fixe ; consultez le placement indiqué.'
+    details.description = 'Les joueurs changent de table et de place selon le plan de chaque manche.'
   } else {
     const info = getMovementInfo(tables)
     const [base, exceptions] = info.comment.split(' — Exceptions: ')
     details.label = info.label === 'Mouvement spécial FFT' ? 'Mouvement spécial' : 'Rotations normales'
-    details.description = describeMoves(base) + ' Les déplacements suivent les numéros de table, en boucle.'
+    details.description = describeMoves(base)
     if (exceptions) details.exceptions = exceptions.split(/;\s*(?=Manche\s)/).map(exception => {
       const [round, moves] = exception.split(': ')
-      return `Vers la ${round.toLowerCase()} : ${describeMoves(moves)}`
+      return `M${round.split(" ")[1]} : ${describeMoves(moves)}`
     })
   }
   if (mode === 'morts') details.note = 'Les morts restent au Nord ; les places sont ajustées si nécessaire.'
   return details
 }
 
-export function createPlan(count, rounds, mode, exclusions = []) {
+export function createPlan(count, rounds, mode, exclusions = [], optimized = true) {
   const option = optionsFor(count).find(option => option.value === mode && !option.disabled)
   if (!option) throw new Error('Choisissez une répartition disponible pour cet effectif.')
   const limit = maxRounds(count, mode)
@@ -131,6 +136,7 @@ export function createPlan(count, rounds, mode, exclusions = []) {
       }
     }
   }
+  if (optimized && (mode === 'morts' || mode === 'mixed')) rotations = optimizeRotations(rotations, count)
   return { count, rounds, mode, excluded, rotations }
 }
 
@@ -144,4 +150,33 @@ export function positionsFor(plan, id) {
     }
     throw new Error(`Placement manquant pour le joueur ${id}.`)
   })
+}
+
+// Reuse precisely the same preparation and mort corrections for a fair baseline.
+export function createOriginalPlan(count, rounds, mode, exclusions = []) {
+  return createPlan(count, rounds, mode, exclusions, false)
+}
+
+export function encountersFor(plan) {
+  const encounters = Array.from({ length: plan.count }, () => new Map())
+  for (const tables of Object.values(plan.rotations)) for (const table of tables) {
+    const players = table.joueurs.filter(player => player.id !== null)
+    for (const player of players) for (const other of players) if (player.id !== other.id) {
+      const row = encounters[player.id - 1]
+      row.set(other.id, (row.get(other.id) || 0) + 1)
+    }
+  }
+  return encounters.map(row => [...row].sort(([a], [b]) => a - b).map(([id, times]) => ({ id, times })))
+}
+
+export function tableVisitsFor(plan) {
+  const visits = Array.from({ length: plan.count }, () => ({ mort: 0, five: 0 }))
+  for (const tables of Object.values(plan.rotations)) for (const table of tables) {
+    const mort = table.joueurs.some(player => player.id === null)
+    for (const player of table.joueurs) if (player.id !== null) {
+      if (mort) visits[player.id - 1].mort++
+      if (table.joueurs.length === 5) visits[player.id - 1].five++
+    }
+  }
+  return visits
 }

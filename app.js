@@ -1,4 +1,4 @@
-import { optionsFor, maxRounds, movementDetails, createPlan, positionsFor, seats } from './engine.js'
+import { optionsFor, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, positionsFor, seats } from './engine.js'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -89,9 +89,60 @@ function persist() {
   } catch { /* Device storage may be unavailable. */ }
 }
 
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres' }
+
+function showPage(focus = false) {
+  const requested = location.hash.slice(1)
+  const page = Object.hasOwn(pages, requested) ? requested : 'reglages'
+  if (page !== 'reglages' && !plan) { location.hash = 'reglages'; return }
+  $('setup').hidden = page !== 'reglages'
+  $('results').hidden = page !== 'placements'
+  $('encounters').hidden = page !== 'rencontres'
+  $('page-title').textContent = pages[page]
+  document.title = `${pages[page]} · Rotations Tarot`
+  for (const link of document.querySelectorAll('[data-page]')) {
+    if (link.dataset.page === page) link.setAttribute('aria-current', 'page')
+    else link.removeAttribute('aria-current')
+  }
+  if (focus) { $('page-title').focus(); window.scrollTo(0, 0) }
+}
+
 function showPlan() {
-  $('results').hidden = false
-  renderPlayers(); renderRound(); selectView(view); persist()
+  $('tournament-summary').textContent = `${plan.count} joueurs · ${plan.rounds} manches · ${optionsFor(plan.count).find(option => option.value === plan.mode).label}`
+  renderPlayers(); renderRound(); renderEncounters(); selectView(view); persist(); showPage()
+}
+
+function renderEncounters() {
+  const rows = encountersFor(plan), visits = tableVisitsFor(plan)
+  const pending = plan.excluded.some(id => id === null)
+  $('encounters-note').textContent = `J7 (3) = trois manches à la même table que le joueur 7. Exempts compris, morts exclus.${pending ? ' Les manches sans exclu choisi ne sont pas comptées.' : ''}`
+  const summary = $('encounters-summary')
+  summary.replaceChildren()
+  const repeats = rows.reduce((sum, row) => sum + row.reduce((s, player) => s + player.times - 1, 0), 0) / 2
+  const parts = [`${repeats} rencontre${repeats > 1 ? 's' : ''} répétée${repeats > 1 ? 's' : ''} au total`]
+  for (const [key, label] of [['mort', 'Tables avec mort'], ['five', 'Tables de cinq']]) {
+    const values = visits.map(v => v[key])
+    if (Math.max(...values)) parts.push(`${label} : ${Math.min(...values)} à ${Math.max(...values)} passages par joueur`)
+  }
+  for (const part of parts) { const p = document.createElement('p'); p.textContent = part; summary.append(p) }
+  const container = $('encounter-cards')
+  container.replaceChildren()
+  for (const [index, row] of rows.entries()) {
+    const card = document.createElement('article'); card.className = 'encounter-card'
+    const title = document.createElement('h3'); title.textContent = `Joueur ${index + 1}`
+    const list = document.createElement('p'); list.className = 'encounter-list'
+    list.textContent = row.length ? row.map(({ id, times }) => `J${id} (${times})`).join(', ') : 'Aucune rencontre'
+    const total = document.createElement('p'); total.className = 'encounter-meta'
+    const repeated = row.reduce((sum, encounter) => sum + encounter.times - 1, 0)
+    total.textContent = `${row.length} joueurs rencontrés · ${repeated} rencontre${repeated > 1 ? 's' : ''} répétée${repeated > 1 ? 's' : ''}`
+    card.append(title, list, total)
+    if (plan.mode === 'morts' || plan.mode === 'mixed') {
+      const passage = document.createElement('p'); passage.className = 'encounter-meta'
+      passage.textContent = plan.mode === 'morts' ? `Tables avec mort : ${visits[index].mort} passages` : `Tables de cinq : ${visits[index].five} passages`
+      card.append(passage)
+    }
+    container.append(card)
+  }
 }
 
 function renderNavigation() {
@@ -168,12 +219,13 @@ function recalculate() {
     round = Math.min(round, plan.rounds - 1)
     if (selectedPlayer > plan.count) selectedPlayer = 0
     $('error').textContent = ''; showPlan()
-  } catch (error) { $('error').textContent = error.message; $('results').hidden = true }
+  } catch (error) { $('error').textContent = error.message; plan = null; $('tournament-summary').textContent = ''; location.hash = 'reglages'; showPage() }
 }
 
 $('count').addEventListener('change', () => { manualExclusions = []; updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
-$('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate() })
+$('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate(); if (plan) location.hash = 'placements' })
+window.addEventListener('hashchange', () => showPage(true))
 $('by-player').addEventListener('click', () => selectView('player'))
 $('by-round').addEventListener('click', () => selectView('round'))
 for (const id of ['by-player', 'by-round']) $(id).addEventListener('keydown', event => {

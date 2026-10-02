@@ -15,14 +15,21 @@
   <title>Rotations Tarot</title>
 </head>
 <body>
-  <header class="topbar"><h1><a href="./"><span class="brand-icon" aria-hidden="true">♠</span> Rotations Tarot</a></h1></header>
+  <header class="topbar"><h1><a href="#reglages"><span class="brand-icon" aria-hidden="true">♠</span> Rotations Tarot</a></h1></header>
+  <nav class="page-navigation" aria-label="Navigation principale">
+    <a href="#reglages" data-page="reglages">Réglages</a>
+    <a href="#placements" data-page="placements">Placements</a>
+    <a href="#rencontres" data-page="rencontres">Rencontres</a>
+  </nav>
   <main>
+    <div class="page-heading"><h2 id="page-title" tabindex="-1">Réglages</h2><p id="tournament-summary"></p></div>
     <section id="setup" class="panel" aria-label="Réglages">
       <form id="setup-form">
         <div class="field-grid"><label>Nombre de joueurs<select id="count"></select></label><label>Nombre de manches<select id="rounds"></select></label></div>
         <fieldset id="mode-field"><legend>Répartition</legend><div id="modes"></div></fieldset>
         <fieldset id="excluded-field" hidden><legend>Exclus</legend><div id="exclusion-selectors" class="field-grid"></div></fieldset>
         <div id="movement-info" class="movement-info" role="status"></div>
+        <button type="submit" class="primary">Voir les placements <span aria-hidden="true">→</span></button>
         <p id="error" class="error" role="alert"></p>
       </form>
     </section>
@@ -35,6 +42,11 @@
         <div id="player-cards" class="player-grid"></div>
       </div>
       <div id="round-view" role="tabpanel" aria-labelledby="by-round" hidden><p id="excluded-notice" class="notice" hidden></p><div id="table-cards" class="table-grid"></div></div>
+    </section>
+    <section id="encounters" hidden aria-label="Rencontres">
+      <p id="encounters-note" class="encounters-note"></p>
+      <div id="encounters-summary" class="encounters-summary"></div>
+      <div id="encounter-cards" class="encounter-grid"></div>
     </section>
   </main>
   <script type="module" src="app.js"></script>

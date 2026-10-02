@@ -58,7 +58,7 @@ test('installation caches every app dependency, including iPhone icons', async (
   await app.lifecycle('install')
   assert.ok(app.skipped)
   const entries = [...app.stores.values()][0]
-  for (const filename of ['index.html', 'app.js', 'engine.js', 'movements.js', 'style.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png']) {
+  for (const filename of ['index.html', 'app.js', 'engine.js', 'optimizer.js', 'movements.js', 'style.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png']) {
     assert.ok(entries.has(new URL(filename, app.scope).href))
     await readFile(new URL(filename, import.meta.url))
   }
@@ -67,12 +67,12 @@ test('installation caches every app dependency, including iPhone icons', async (
 test('installed app and modules reopen from cache when the network is unavailable', async () => {
   const app = worker()
   await app.lifecycle('install')
-  for (const filename of ['./', 'index.html', 'app.js', 'engine.js', 'movements.js', 'style.css']) {
+  for (const filename of ['./', 'index.html', 'app.js', 'engine.js', 'optimizer.js', 'movements.js', 'style.css']) {
     const response = await app.request(filename)
     assert.equal(response.status, 200)
     assert.equal(await response.text(), `cached:${filename === './' ? './' : './' + filename}`)
   }
-  assert.equal(app.networkCalls, 6)
+  assert.equal(app.networkCalls, 7)
 })
 
 test('navigation with a query uses the cached app under its repository path', async () => {
