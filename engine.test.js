@@ -98,3 +98,19 @@ test('manual exclusions leave unchosen rounds pending and never seat an excluded
   assert.deepEqual(positionsFor(manual, 8), [{ excluded: true }, { pending: true }, { excluded: true }, { pending: true }])
   for (const name of ['Manche 1', 'Manche 3']) assert.ok(manual.rotations[name].every(table => table.joueurs.every(player => player.id !== 8)))
 })
+
+test('excluded players are removed without changing the N, S, E, O order', () => {
+  const plan = createPlan(13, 2, 'excluded', [2, 7])
+  assert.deepEqual(plan.rotations['Manche 1'][0].joueurs.map(player => player.id), [1, 3, 4, 5])
+  assert.deepEqual(plan.rotations['Manche 1'][1].joueurs.map(player => player.id), [6, 7, 8, 9])
+  assert.deepEqual(plan.rotations['Manche 2'][0].joueurs.map(player => player.id), [1, 2, 3, 4])
+  assert.deepEqual(plan.rotations['Manche 2'][1].joueurs.map(player => player.id), [5, 6, 8, 9])
+  assert.deepEqual(positionsFor(plan, 1), [
+    { table: 1, seat: 'Nord', short: 'N' },
+    { table: 1, seat: 'Nord', short: 'N' }
+  ])
+  assert.deepEqual(positionsFor(plan, 3), [
+    { table: 1, seat: 'Sud', short: 'S' },
+    { table: 1, seat: 'Est', short: 'E' }
+  ])
+})

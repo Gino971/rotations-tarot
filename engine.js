@@ -1,4 +1,4 @@
-import { calculRotationsRainbow, computeActiveFromBase, getMovementInfo } from './movements.js'
+import { calculRotationsRainbow, getMovementInfo } from './movements.js'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -87,7 +87,6 @@ export function createPlan(count, rounds, mode, exclusions = []) {
   const excluded = []
   if (mode === 'excluded') {
     rotations = {}
-    const reserved = count - 1
     for (let r = 0; r < rounds; r++) {
       const id = exclusions[r] ?? null
       if (id !== null && (!Number.isInteger(id) || id < 1 || id > count)) throw new Error(`Choisissez un joueur de 1 à ${count} pour la manche ${r + 1}.`)
@@ -96,9 +95,9 @@ export function createPlan(count, rounds, mode, exclusions = []) {
         rotations[`Manche ${r + 1}`] = []
         continue
       }
-      const index = base.findIndex(p => p.id === id)
-      ;[base[reserved], base[index]] = [base[index], base[reserved]]
-      const active = computeActiveFromBase(base, reserved, `Joueur ${id}`)
+      // Keep every remaining player in numerical order. The table array is
+      // read as Nord, Sud, Est, Ouest by both the engine and the interface.
+      const active = base.filter(player => player.id !== id)
       rotations[`Manche ${r + 1}`] = calculRotationsRainbow(active, 1)['Manche 1']
     }
   } else if (mode === 'mixed' && count === 6) {
