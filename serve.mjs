@@ -15,4 +15,4 @@ http.createServer(async (request, response) => {
     response.writeHead(200, { 'Content-Type': types[path.extname(filename)], 'Cache-Control': 'no-cache' })
     response.end(content)
   } catch { response.writeHead(404); response.end('Introuvable') }
-}).listen(port, '0.0.0.0', () => console.log(`Rotations Tarot : http://localhost:${port}`))
+}).listen(port, '0.0.0.0', () => console.log(`Rotations tarot : http://localhost:${port}`))

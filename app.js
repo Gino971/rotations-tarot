@@ -99,7 +99,7 @@ function showPage(focus = false) {
   $('results').hidden = page !== 'placements'
   $('encounters').hidden = page !== 'rencontres'
   $('page-title').textContent = pages[page]
-  document.title = `${pages[page]} · Rotations Tarot`
+  document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')

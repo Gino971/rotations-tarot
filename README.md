@@ -1,4 +1,4 @@
-# Rotations Tarot
+# Rotations tarot
 
 Application mobile autonome : joueurs numérotés, sans noms, compte ni scores. Trois pages accessibles par navigation : Réglages, Placements et Rencontres. Choisir l’effectif et le nombre de manches dans les réglages ; les placements se recalculent immédiatement. La page Rencontres résume, pour chaque joueur, ses adversaires de table et le nombre de manches partagées, ainsi que ses passages aux tables particulières. Les liens directs et les boutons précédent/suivant du navigateur conservent les réglages. Consulter toutes les positions par joueur ou les tables de chaque manche. La session reste enregistrée dans ce navigateur, sur cet appareil.
 
