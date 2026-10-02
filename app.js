@@ -1,4 +1,4 @@
-import { optionsFor, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, positionsFor, seats } from './engine.js'
+import { optionsFor, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawOrder, positionsFor, seats } from './engine.js'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -11,6 +11,9 @@ let manualExclusions = []
 let drawSeed = null
 let drawing = false
 let drawAudio = null
+let drawSound = true
+let showDrawResult = false
+const chipSuits = new Map()
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
 $('count').value = '16'
@@ -88,7 +91,7 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, drawSound: $('draw-sound').checked, view, round, selectedPlayer }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, drawSound: drawSound, view, round, selectedPlayer }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
@@ -225,23 +228,40 @@ function recalculate() {
   } catch (error) { $('error').textContent = error.message; plan = null; $('tournament-summary').textContent = ''; location.hash = 'reglages'; showPage() }
 }
 
-$('count').addEventListener('change', () => { manualExclusions = []; drawSeed = null; updateOptions(); recalculate() })
+$('count').addEventListener('change', () => { manualExclusions = []; drawSeed = null; showDrawResult = false; chipSuits.clear(); updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
-function renderDrawOrder() {
-  const container = $('draw-order')
+function buildDrawChips(order, container) {
   container.replaceChildren()
-  $('draw-result').hidden = drawSeed === null
-  if (drawSeed === null) return
-  const tables = plan.rotations['Manche 1']
-  if (!tables.length) {
-    const message = document.createElement('p')
-    message.textContent = 'Tirage enregistré. Choisissez l’exclu de la première manche pour afficher les places.'
-    container.append(message); return
+  let group
+  for (const [index, id] of order.entries()) {
+    if (index % 4 === 0) {
+      group = document.createElement('div'); group.className = 'chip-group'
+      group.setAttribute('role', 'group')
+      group.setAttribute('aria-label', `Positions ${index + 1} à ${Math.min(index + 4, order.length)}`)
+      container.append(group)
+    }
+    const slot = document.createElement('div'); slot.className = 'chip-slot'; slot.dataset.slot = index
+    const chip = document.createElement('span'); chip.className = 'draw-player draw-chip'; chip.dataset.player = id
+    chip.setAttribute('aria-label', `Joueur ${id}`)
+    if (!chipSuits.has(id)) {
+      const random = new Uint32Array(1); crypto.getRandomValues(random)
+      chipSuits.set(id, ['♠', '♥', '♦', '♣'][random[0] % 4])
+    }
+    const suit = chipSuits.get(id)
+    const diamond = document.createElement('span'); diamond.className = `chip-suit ${suit === '♥' || suit === '♦' ? 'red' : 'black'}`; diamond.textContent = suit; diamond.setAttribute('aria-hidden', 'true')
+    const number = document.createElement('span'); number.className = 'chip-number'; number.textContent = id
+    chip.append(number, diamond)
+    const position = document.createElement('span'); position.className = 'chip-position'; position.textContent = ['N', 'S', 'E', 'O'][index % 4]
+    position.setAttribute('aria-label', ['Nord', 'Sud', 'Est', 'Ouest'][index % 4])
+    slot.append(chip, position); group.append(slot)
   }
-  buildDrawTables(tables, container)
-  if (plan.excluded[0]) {
-    const excluded = document.createElement('p'); excluded.textContent = `Exclu : joueur ${plan.excluded[0]}`; container.append(excluded)
-  }
+}
+
+function renderDrawOrder() {
+  if (drawing) return
+  $('draw-result').hidden = false
+  $('draw-order-title').textContent = showDrawResult && drawSeed !== null ? 'Ordre tiré au sort' : 'Ordre initial'
+  buildDrawChips(drawOrder(plan.count, showDrawResult ? drawSeed : null), $('draw-order'))
 }
 
 function buildDrawTables(tables, container) {
@@ -283,7 +303,7 @@ async function moveDrawPlayers(moves, reduced, duration) {
 }
 
 function drawTone(frequency, duration = 0.05, delay = 0) {
-  if (!drawAudio || drawAudio.state !== 'running' || !$('draw-sound').checked) return
+  if (!drawAudio || drawAudio.state !== 'running' || !drawSound) return
   const oscillator = drawAudio.createOscillator(), volume = drawAudio.createGain()
   const start = drawAudio.currentTime + delay
   oscillator.type = 'sine'; oscillator.frequency.value = frequency
@@ -295,20 +315,33 @@ function drawTone(frequency, duration = 0.05, delay = 0) {
   oscillator.onended = () => { oscillator.disconnect(); volume.disconnect() }
 }
 
-$('draw-sound').addEventListener('change', () => { if (plan) persist() })
+function renderSoundToggle() {
+  const button = $('draw-sound')
+  button.setAttribute('aria-pressed', String(drawSound))
+  button.setAttribute('aria-label', drawSound ? 'Couper le son du tirage' : 'Activer le son du tirage')
+  button.title = drawSound ? 'Couper le son' : 'Activer le son'
+}
+$('draw-sound').addEventListener('click', () => { drawSound = !drawSound; renderSoundToggle(); if (plan) persist() })
+function confirmRedraw() {
+  const dialog = $('redraw-dialog')
+  return new Promise(resolve => {
+    dialog.returnValue = 'cancel'
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true })
+    dialog.showModal()
+  })
+}
 $('draw').addEventListener('click', async () => {
   if (drawing) return
-  if (mode === 'excluded' && !manualExclusions[0]) { $('draw-status').textContent = 'Choisissez d’abord l’exclu de la première manche.'; return }
   drawing = true
+  if (drawSeed !== null && !(await confirmRedraw())) { drawing = false; return }
   const controls = [...$('setup-form').querySelectorAll('button, select, input')].filter(control => control.id !== 'draw-sound')
   const previous = controls.map(control => control.disabled)
   controls.forEach(control => { control.disabled = true })
-  $('draw-animation').hidden = false
-  $('draw-result').hidden = true
+  $('draw-result').hidden = false
   $('draw-status').textContent = 'Tirage en cours…'
   $('draw').textContent = 'Tirage en cours…'
   try {
-    if ($('draw-sound').checked) {
+    if (drawSound) {
       try {
         const Audio = window.AudioContext || window.webkitAudioContext
         if (Audio) { drawAudio ||= new Audio(); await drawAudio.resume() }
@@ -317,42 +350,44 @@ $('draw').addEventListener('click', async () => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const count = Number($('count').value)
     const seed = new Uint32Array(1); crypto.getRandomValues(seed)
-    const initial = createPlan(count, 1, mode, manualExclusions)
-    const final = createPlan(count, 1, mode, manualExclusions, true, seed[0])
-    buildDrawTables(initial.rotations['Manche 1'], $('draw-tables'))
-    $('draw-stage').textContent = 'Placement initial · ordre des numéros'
+    const finalOrder = drawOrder(count, seed[0])
+    const startingOrder = drawOrder(count, drawSeed)
+    const visibleOrder = [...$('draw-order').querySelectorAll('[data-player]')].map(token => Number(token.dataset.player))
+    if (visibleOrder.length !== startingOrder.length || visibleOrder.some((id, index) => id !== startingOrder[index])) buildDrawChips(startingOrder, $('draw-order'))
+    $('draw-order-title').textContent = drawSeed === null ? 'Ordre initial' : 'Dernier tirage'
     await new Promise(resolve => setTimeout(resolve, 600))
-    $('draw-stage').textContent = 'Les joueurs échangent leurs places…'
-    const slots = [...$('draw-tables').querySelectorAll('[data-slot]')]
+    $('draw-order-title').textContent = 'Mélange des jetons…'
+    const slots = [...$('draw-order').querySelectorAll('[data-slot]')]
     const started = performance.now()
     while (performance.now() - started < 4500) {
-      const choices = new Uint32Array(2); crypto.getRandomValues(choices)
-      const a = choices[0] % slots.length
-      const b = (a + 1 + choices[1] % (slots.length - 1)) % slots.length
-      await moveDrawPlayers([[slots[a].querySelector('.draw-player'), slots[b]], [slots[b].querySelector('.draw-player'), slots[a]]], reduced, 180)
+      const shuffled = [...slots]
+      const choices = new Uint32Array(count); crypto.getRandomValues(choices)
+      for (let i = count - 1; i > 0; i--) {
+        const j = choices[i] % (i + 1)
+        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      const moves = slots.map((slot, index) => [slot.querySelector('.draw-player'), shuffled[index]])
+      await moveDrawPlayers(moves, reduced, 220)
       drawTone(400 + choices[0] % 300)
       await new Promise(resolve => setTimeout(resolve, 70))
     }
-    const tokens = new Map([...$('draw-tables').querySelectorAll('[data-player]')].map(token => [Number(token.dataset.player), token]))
-    const destinations = new Map(slots.map(slot => [slot.dataset.slot, slot]))
-    const moves = []
-    for (const table of final.rotations['Manche 1']) for (const [index, player] of table.joueurs.entries()) if (player.id !== null) {
-      const token = tokens.get(player.id), destination = destinations.get(`${table.table}:${index}`)
-      if (token.parentElement !== destination) moves.push([token, destination])
-    }
+    const tokens = new Map([...$('draw-order').querySelectorAll('[data-player]')].map(token => [Number(token.dataset.player), token]))
+    const moves = finalOrder.map((id, index) => [tokens.get(id), slots[index]])
     await moveDrawPlayers(moves, reduced, Math.max(100, 5000 - (performance.now() - started)))
     drawSeed = seed[0]
+    showDrawResult = true
     recalculate()
     drawTone(523, 0.15); drawTone(659, 0.15, 0.12); drawTone(784, 0.24, 0.24)
     $('draw-status').textContent = 'Tirage terminé et enregistré.'
+    $('draw-order-title').textContent = 'Ordre tiré au sort'
   } finally {
     drawing = false
     controls.forEach((control, index) => { control.disabled = previous[index] })
-    $('draw-animation').hidden = true
+    $('draw-result').hidden = false
     $('draw').textContent = 'Tirer au sort'
   }
 })
-$('reset-draw').addEventListener('click', () => { drawSeed = null; recalculate() })
+$('reset-draw').addEventListener('click', () => { drawSeed = null; showDrawResult = false; recalculate() })
 $('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate(); if (plan) location.hash = 'placements' })
 window.addEventListener('hashchange', () => showPage(true))
 $('by-player').addEventListener('click', () => selectView('player'))
@@ -373,8 +408,10 @@ try {
   if (saved) {
     const savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
     manualExclusions = Array.isArray(saved.exclusions) ? saved.exclusions : []
-    $('draw-sound').checked = saved.drawSound !== false
+    drawSound = saved.drawSound !== false
+    renderSoundToggle()
     drawSeed = Number.isInteger(saved.drawSeed) && saved.drawSeed >= 0 && saved.drawSeed <= 0xffffffff ? saved.drawSeed : null
+    showDrawResult = drawSeed !== null
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed)
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
     view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))

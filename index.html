@@ -29,10 +29,8 @@
         <fieldset id="mode-field"><legend>Répartition</legend><div id="modes"></div></fieldset>
         <fieldset id="excluded-field" hidden><legend>Exclus</legend><div id="exclusion-selectors" class="field-grid"></div></fieldset>
         <fieldset class="draw-field"><legend>Première manche</legend>
-          <div class="draw-actions"><button id="draw" type="button" class="secondary">Tirer au sort</button><button id="reset-draw" type="button" class="text-button" hidden>Ordre des numéros</button></div>
-          <label class="sound-option"><input id="draw-sound" type="checkbox" checked> Son du tirage</label>
-          <div id="draw-animation" class="draw-animation" hidden><p id="draw-stage" role="status">Placement initial</p><div id="draw-tables" class="table-grid draw-tables"></div></div>
-          <div id="draw-result" class="draw-result" hidden><h3>Ordre de la première manche</h3><div id="draw-order"></div></div>
+          <div class="draw-actions"><button id="draw" type="button" class="secondary">Tirer au sort</button><button id="draw-sound" type="button" class="sound-toggle secondary" aria-pressed="true" aria-label="Couper le son du tirage" title="Couper le son"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6.5 6.8 9.5H4.5v5h2.3l3.7 3V6.5Z"/><g class="sound-waves"><path d="M14 9a4.3 4.3 0 0 1 0 6M17 6.5a7.8 7.8 0 0 1 0 11"/></g><path class="sound-slash" d="m14 9 6 6m0-6-6 6"/></svg></button><button id="reset-draw" type="button" class="text-button" hidden>Ordre des numéros</button></div>
+          <div id="draw-result" class="draw-result" hidden><h3 id="draw-order-title">Ordre initial</h3><p class="hint">Ordre de lecture : de gauche à droite, puis ligne suivante.</p><div id="draw-order" class="chip-grid"></div></div>
           <p id="draw-status" class="hint" role="status"></p>
         </fieldset>
         <div id="movement-info" class="movement-info" role="status"></div>
@@ -56,6 +54,13 @@
       <div id="encounter-cards" class="encounter-grid"></div>
     </section>
   </main>
+  <dialog id="redraw-dialog" class="redraw-dialog" aria-labelledby="redraw-title" aria-describedby="redraw-description">
+    <form method="dialog">
+      <h2 id="redraw-title">Refaire le tirage ?</h2>
+      <p id="redraw-description">Les placements actuels seront remplacés.</p>
+      <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
+    </form>
+  </dialog>
   <script type="module" src="app.js"></script>
 </body>
 </html>

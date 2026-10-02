@@ -85,7 +85,7 @@ export function movementDetails(count, mode) {
   return details
 }
 
-function drawOrder(count, seed) {
+export function drawOrder(count, seed) {
   const order = Array.from({ length: count }, (_, i) => i + 1)
   if (seed === null) return order
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('Tirage invalide.')
