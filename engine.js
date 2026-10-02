@@ -29,7 +29,11 @@ function initialPlayers(count, mode) {
 }
 
 export function maxRounds(count, mode) {
-  if (mode === 'excluded' || (mode === 'mixed' && count === 6)) return 7
+  if (mode === 'excluded') {
+    const active = initialPlayers(count, mode).slice(0, -1)
+    return Object.keys(calculRotationsRainbow(active, 7)).length
+  }
+  if (mode === 'mixed' && count === 6) return 7
   const base = initialPlayers(count, mode)
   return Object.keys(calculRotationsRainbow(base, 7)).length
 }
@@ -53,7 +57,7 @@ export function movementDetails(count, mode) {
   const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
   if (mode === 'excluded') {
     details.label = 'Mouvement spécial · exclu manuel'
-    details.description = 'Choisissez l’exclu de chaque manche selon les résultats. Les placements sont recalculés selon ce choix ; l’exclu n’a pas de place.'
+    details.description = 'Choisissez l’exclu de chaque manche selon les résultats. Le mouvement de la manche est appliqué aux joueurs restants, dans l’ordre Nord, Sud, Est, Ouest ; l’exclu n’a pas de place.'
     return details
   }
   if (mode === 'mixed' || tables < 3) {
@@ -98,7 +102,7 @@ export function createPlan(count, rounds, mode, exclusions = []) {
       // Keep every remaining player in numerical order. The table array is
       // read as Nord, Sud, Est, Ouest by both the engine and the interface.
       const active = base.filter(player => player.id !== id)
-      rotations[`Manche ${r + 1}`] = calculRotationsRainbow(active, 1)['Manche 1']
+      rotations[`Manche ${r + 1}`] = calculRotationsRainbow(active, r + 1)[`Manche ${r + 1}`]
     }
   } else if (mode === 'mixed' && count === 6) {
     // The original small-count fallback made a table of 2. Keep all six

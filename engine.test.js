@@ -79,10 +79,10 @@ test('movement explanations describe source rules, exceptions and real limits', 
   assert.equal(morts.limit, 5)
   assert.deepEqual(morts.exceptions, special.exceptions)
   assert.match(morts.note, /morts restent au Nord/)
-  for (const count of [13, 17, 25, 33]) {
+  for (const [count, limit] of [[13, 6], [17, 5], [25, 5], [33, 6]]) {
     const manual = movementDetails(count, 'excluded')
     assert.equal(manual.tables, (count - 1) / 4)
-    assert.equal(manual.limit, 7)
+    assert.equal(manual.limit, limit)
     assert.match(manual.description, /l’exclu n’a pas de place/)
     assert.deepEqual(manual.exceptions, [])
   }
@@ -103,14 +103,19 @@ test('excluded players are removed without changing the N, S, E, O order', () =>
   const plan = createPlan(13, 2, 'excluded', [2, 7])
   assert.deepEqual(plan.rotations['Manche 1'][0].joueurs.map(player => player.id), [1, 3, 4, 5])
   assert.deepEqual(plan.rotations['Manche 1'][1].joueurs.map(player => player.id), [6, 7, 8, 9])
-  assert.deepEqual(plan.rotations['Manche 2'][0].joueurs.map(player => player.id), [1, 2, 3, 4])
-  assert.deepEqual(plan.rotations['Manche 2'][1].joueurs.map(player => player.id), [5, 6, 8, 9])
-  assert.deepEqual(positionsFor(plan, 1), [
-    { table: 1, seat: 'Nord', short: 'N' },
-    { table: 1, seat: 'Nord', short: 'N' }
-  ])
-  assert.deepEqual(positionsFor(plan, 3), [
-    { table: 1, seat: 'Sud', short: 'S' },
-    { table: 1, seat: 'Est', short: 'E' }
-  ])
+  assert.notDeepEqual(
+    plan.rotations['Manche 2'].map(table => table.joueurs.map(player => player.id)),
+    [[1, 2, 3, 4], [5, 6, 8, 9], [10, 11, 12, 13]]
+  )
+  assert.deepEqual(plan.rotations['Manche 2'].flatMap(table => table.joueurs.map(player => player.id)).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13])
+})
+
+test('excluded mode applies each successive movement and its real round limit', () => {
+  for (const [count, limit] of [[9, 7], [13, 6], [17, 5], [21, 7], [25, 5], [33, 6]]) {
+    assert.equal(maxRounds(count, 'excluded'), limit)
+    const exclusions = Array.from({ length: limit }, (_, index) => index % count + 1)
+    const plan = createPlan(count, limit, 'excluded', exclusions)
+    if (limit > 1) assert.notDeepEqual(plan.rotations['Manche 1'], plan.rotations['Manche 2'])
+    assert.throws(() => createPlan(count, limit + 1, 'excluded', exclusions))
+  }
 })
