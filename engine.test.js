@@ -1,13 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { optionsFor, createPlan, positionsFor, maxRounds, movementDetails } from './engine.js'
+import { optionsFor, normalizeExclusions, createPlan, positionsFor, maxRounds, movementDetails } from './engine.js'
 import { calculRotationsRainbow } from './movements.js'
 
 test('every player has exactly one position per round across all supported counts and modes', () => {
   for (let count = 4; count <= 400; count++) {
     for (const option of optionsFor(count).filter(option => !option.disabled)) {
       const rounds = maxRounds(count, option.value)
-      const exclusions = Array.from({ length: rounds }, (_, index) => index % count + 1)
+      const exclusions = Array.from({ length: rounds }, (_, index) => index < count ? index + 1 : null)
       const plan = createPlan(count, rounds, option.value, exclusions)
       const details = movementDetails(count, option.value)
       assert.equal(details.tables, plan.rotations['Manche 1'].length, `table count: ${count}, ${option.value}`)
@@ -15,6 +15,7 @@ test('every player has exactly one position per round across all supported count
       assert.equal(Object.keys(plan.rotations).length, rounds)
       for (const [index, tables] of Object.values(plan.rotations).entries()) {
         const ids = tables.flatMap(table => table.joueurs.map(player => player.id)).filter(id => id !== null)
+        if (option.value === 'excluded' && plan.excluded[index] === null) { assert.deepEqual(ids, []); continue }
         if (plan.excluded[index]) ids.push(plan.excluded[index])
         assert.deepEqual(ids.sort((a, b) => a - b), Array.from({ length: count }, (_, i) => i + 1), `count=${count}, mode=${option.value}, round=${index}`)
         if (option.value.startsWith('morts')) for (const table of tables) assert.ok(table.joueurs.slice(1).every(player => player.id !== null))
@@ -39,7 +40,7 @@ test('mixed table exceptions and source movement limits', () => {
   assert.equal(maxRounds(24, 'normal'), 5)
   assert.equal(maxRounds(32, 'normal'), 6)
   assert.throws(() => createPlan(24, 6, 'normal'))
-  assert.deepEqual(createPlan(9, 4, 'excluded', [8, 8, 1, 2]).excluded, [8, 8, 1, 2])
+  assert.deepEqual(createPlan(9, 4, 'excluded', [8, 9, 1, 2]).excluded, [8, 9, 1, 2])
 })
 
 test('invalid configurations are rejected', () => {
@@ -94,10 +95,10 @@ test('manual exclusions leave unchosen rounds pending and never seat an excluded
   assert.deepEqual(blank.excluded, [null, null, null, null])
   assert.ok(Object.values(blank.rotations).every(tables => tables.length === 0))
   assert.ok(positionsFor(blank, 1).every(position => position.pending))
-  const manual = createPlan(9, 4, 'excluded', [8, null, 8])
-  assert.deepEqual(manual.excluded, [8, null, 8, null])
-  assert.deepEqual(positionsFor(manual, 8), [{ excluded: true }, { pending: true }, { excluded: true }, { pending: true }])
-  for (const name of ['Manche 1', 'Manche 3']) assert.ok(manual.rotations[name].every(table => table.joueurs.every(player => player.id !== 8)))
+  const manual = createPlan(9, 4, 'excluded', [8, null, 7])
+  assert.deepEqual(manual.excluded, [8, null, 7, null])
+  assert.deepEqual(positionsFor(manual, 8).slice(0, 2), [{ excluded: true }, { pending: true }])
+  for (const [name, id] of [['Manche 1', 8], ['Manche 3', 7]]) assert.ok(manual.rotations[name].every(table => table.joueurs.every(player => player.id !== id)))
 })
 
 test('excluded players are removed without changing the N, S, E, O order', () => {
@@ -114,9 +115,16 @@ test('excluded players are removed without changing the N, S, E, O order', () =>
 test('excluded mode applies each successive movement and its real round limit', () => {
   for (const [count, limit] of [[9, 7], [13, 6], [17, 5], [21, 7], [25, 5], [33, 6]]) {
     assert.equal(maxRounds(count, 'excluded'), limit)
-    const exclusions = Array.from({ length: limit }, (_, index) => index % count + 1)
+    const exclusions = Array.from({ length: limit }, (_, index) => index < count ? index + 1 : null)
     const plan = createPlan(count, limit, 'excluded', exclusions)
     if (limit > 1) assert.notDeepEqual(plan.rotations['Manche 1'], plan.rotations['Manche 2'])
     assert.throws(() => createPlan(count, limit + 1, 'excluded', exclusions))
   }
+})
+
+test('a player may be excluded only once and conflicting later choices are cleared', () => {
+  assert.throws(() => createPlan(9, 4, 'excluded', [6, null, 6]), /déjà été exclu/)
+  assert.deepEqual(normalizeExclusions(9, [6, 2, 6, 2], 4), [6, 2, null, null])
+  assert.deepEqual(normalizeExclusions(9, [6, null, 3, 8], 4), [6, null, 3, 8])
+  assert.deepEqual(normalizeExclusions(9, [6, 3, 3, 8], 4), [6, 3, null, 8])
 })

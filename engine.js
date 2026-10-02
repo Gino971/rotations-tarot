@@ -112,9 +112,12 @@ export function createPlan(count, rounds, mode, exclusions = [], optimized = tru
   const excluded = []
   if (mode === 'excluded') {
     rotations = {}
+    const alreadyExcluded = new Set()
     for (let r = 0; r < rounds; r++) {
       const id = exclusions[r] ?? null
       if (id !== null && (!Number.isInteger(id) || id < 1 || id > count)) throw new Error(`Choisissez un joueur de 1 à ${count} pour la manche ${r + 1}.`)
+      if (id !== null && alreadyExcluded.has(id)) throw new Error(`Le joueur ${id} a déjà été exclu.`)
+      if (id !== null) alreadyExcluded.add(id)
       excluded.push(id)
       if (id === null) {
         rotations[`Manche ${r + 1}`] = []
@@ -198,4 +201,28 @@ export function tableVisitsFor(plan) {
     }
   }
   return visits
+}
+
+export function drawSlotsFor(count, mode, exclusions = [], seed = null) {
+  const first = createPlan(count, 1, mode, exclusions, true, seed)
+  if (mode === 'excluded' && first.excluded[0] === null) return drawOrder(count, seed)
+  const order = first.rotations['Manche 1'].flatMap(table => table.joueurs.map(player => player.id))
+  if (first.excluded[0]) order.push(first.excluded[0])
+  return order
+}
+
+export function drawGroupSizesFor(count, mode, exclusions = []) {
+  const first = createPlan(count, 1, mode, exclusions)
+  if (mode === 'excluded') return [...Array((count - 1) / 4).fill(4), 1]
+  return first.rotations['Manche 1'].map(table => table.joueurs.length)
+}
+
+export function normalizeExclusions(count, exclusions, rounds) {
+  const used = new Set()
+  return Array.from({ length: rounds }, (_, index) => {
+    const id = exclusions[index]
+    if (!Number.isInteger(id) || id < 1 || id > count || used.has(id)) return null
+    used.add(id)
+    return id
+  })
 }

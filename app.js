@@ -1,4 +1,4 @@
-import { optionsFor, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawOrder, positionsFor, seats } from './engine.js'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -76,15 +76,19 @@ function renderExclusionSelectors() {
   if (mode !== 'excluded') return
   const count = Number($('count').value)
   const rounds = Number($('rounds').value)
+  manualExclusions = normalizeExclusions(count, manualExclusions, rounds)
+  const used = new Set()
   for (let index = 0; index < rounds; index++) {
     if (manualExclusions[index] > count) manualExclusions[index] = null
     const label = document.createElement('label')
-    label.textContent = `Exclu · manche ${index + 1}`
+    label.textContent = `Manche ${index + 1}`
     const select = document.createElement('select')
-    select.add(new Option('À choisir', ''))
-    for (let id = 1; id <= count; id++) select.add(new Option(`Joueur ${id}`, id))
+    select.setAttribute('aria-label', `Exclu de la manche ${index + 1}`)
+    select.add(new Option('—', ''))
+    for (let id = 1; id <= count; id++) if (!used.has(id)) select.add(new Option(`J${id}`, id))
     select.value = manualExclusions[index] ? String(manualExclusions[index]) : ''
-    select.addEventListener('change', () => { manualExclusions[index] = select.value ? Number(select.value) : null; recalculate() })
+    if (manualExclusions[index]) used.add(manualExclusions[index])
+    select.addEventListener('change', () => { manualExclusions[index] = select.value ? Number(select.value) : null; round = index; recalculate() })
     label.append(select); $('exclusion-selectors').append(label)
   }
 }
@@ -200,10 +204,7 @@ function renderPlayers() {
 }
 
 function renderRound() {
-  const excluded = plan.excluded[round]
-  const pending = plan.mode === 'excluded' && excluded === null
-  $('excluded-notice').hidden = !excluded && !pending
-  $('excluded-notice').textContent = pending ? 'Exclu à choisir' : excluded ? `Exclu : joueur ${excluded}` : ''
+  for (const [index, label] of [...$('exclusion-selectors').children].entries()) label.classList.toggle('current-round', index === round)
   const tables = Object.values(plan.rotations)[round]
   buildDrawTables(tables, $('table-cards'))
 }
@@ -221,6 +222,7 @@ function selectView(nextView) {
 
 function recalculate() {
   try {
+    renderExclusionSelectors()
     plan = createPlan(Number($('count').value), Number($('rounds').value), mode, manualExclusions, true, drawSeed)
     round = Math.min(round, plan.rounds - 1)
     if (selectedPlayer > plan.count) selectedPlayer = 0
@@ -232,17 +234,24 @@ $('count').addEventListener('change', () => { manualExclusions = []; drawSeed = 
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
 function buildDrawChips(order, container) {
   container.replaceChildren()
-  let group
+  let group, groupIndex = -1, groupStart = 0, groupEnd = 0
+  const sizes = drawGroupSizesFor(Number($('count').value), mode, manualExclusions)
   for (const [index, id] of order.entries()) {
-    if (index % 4 === 0) {
+    if (index === groupEnd) {
+      groupIndex++; groupStart = index; groupEnd = index + sizes[groupIndex]
       group = document.createElement('div'); group.className = 'chip-group'
       group.setAttribute('role', 'group')
-      group.setAttribute('aria-label', `Positions ${index + 1} à ${Math.min(index + 4, order.length)}`)
+      group.dataset.size = sizes[groupIndex]
+      group.style.gridTemplateColumns = `repeat(${sizes[groupIndex] === 6 ? 3 : sizes[groupIndex]}, minmax(0, 1fr))`
+      group.setAttribute('aria-label', mode === 'excluded' && groupIndex === sizes.length - 1 ? 'Joueur exclu' : `Table ${groupIndex + 1}`)
       container.append(group)
     }
-    const slot = document.createElement('div'); slot.className = 'chip-slot'; slot.dataset.slot = index
-    const chip = document.createElement('span'); chip.className = 'draw-player draw-chip'; chip.dataset.player = id
-    chip.setAttribute('aria-label', `Joueur ${id}`)
+    const excluded = mode === 'excluded' && id === manualExclusions[0]
+    const slot = document.createElement('div'); slot.className = 'chip-slot'
+    if (id !== null && !excluded) slot.dataset.slot = index
+    else slot.classList.add('fixed-chip-slot')
+    const chip = document.createElement('span'); chip.className = 'draw-player draw-chip'; chip.dataset.player = id === null ? 'mort' : id
+    chip.setAttribute('aria-label', id === null ? 'Mort au Nord' : excluded ? `Joueur ${id} exclu` : `Joueur ${id}`)
     if (!chipSuits.has(id)) {
       const random = new Uint32Array(1); crypto.getRandomValues(random)
       chipSuits.set(id, ['♠', '♥', '♦', '♣'][random[0] % 4])
@@ -250,9 +259,16 @@ function buildDrawChips(order, container) {
     const suit = chipSuits.get(id)
     const diamond = document.createElement('span'); diamond.className = `chip-suit ${suit === '♥' || suit === '♦' ? 'red' : 'black'}`; diamond.textContent = suit; diamond.setAttribute('aria-hidden', 'true')
     const number = document.createElement('span'); number.className = 'chip-number'; number.textContent = id
-    chip.append(number, diamond)
-    const position = document.createElement('span'); position.className = 'chip-position'; position.textContent = ['N', 'S', 'E', 'O'][index % 4]
-    position.setAttribute('aria-label', ['Nord', 'Sud', 'Est', 'Ouest'][index % 4])
+    if (id === null) {
+      chip.classList.add('mort-chip')
+      chip.innerHTML = '<svg viewBox="0 0 32 32" class="special-chip-icon" aria-hidden="true"><path d="M7 18C1 6 9 2 16 2s15 4 9 16l-3 3v7H10v-7Z" fill="currentColor"/><circle cx="11" cy="13" r="3" fill="#fff8e9"/><circle cx="21" cy="13" r="3" fill="#fff8e9"/><path d="m16 17-2 4h4Z" fill="#fff8e9"/><path d="M13 25v4m6-4v4" stroke="#fff8e9" stroke-width="2"/></svg>'
+    } else if (excluded) {
+      chip.classList.add('excluded-chip')
+      chip.innerHTML = '<svg viewBox="0 0 32 32" class="special-chip-icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="9" r="4"/><path d="M7 25c0-10 18-10 18 0M4 4l24 24"/></svg>'
+      number.className = 'excluded-chip-number'; chip.append(number)
+    } else chip.append(number, diamond)
+    const position = document.createElement('span'); position.className = 'chip-position'; position.textContent = excluded ? 'Exclu' : ['N', 'S', 'E', 'O', 'X1', 'X2'][index - groupStart]
+    position.setAttribute('aria-label', excluded ? 'Exclu' : seats[index - groupStart])
     slot.append(chip, position); group.append(slot)
   }
 }
@@ -261,7 +277,7 @@ function renderDrawOrder() {
   if (drawing) return
   $('draw-result').hidden = false
   $('draw-order-title').textContent = showDrawResult && drawSeed !== null ? 'Ordre tiré au sort' : 'Ordre initial'
-  buildDrawChips(drawOrder(plan.count, showDrawResult ? drawSeed : null), $('draw-order'))
+  buildDrawChips(drawSlotsFor(plan.count, mode, manualExclusions, showDrawResult ? drawSeed : null), $('draw-order'))
 }
 
 function buildDrawTables(tables, container) {
@@ -350,9 +366,9 @@ $('draw').addEventListener('click', async () => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const count = Number($('count').value)
     const seed = new Uint32Array(1); crypto.getRandomValues(seed)
-    const finalOrder = drawOrder(count, seed[0])
-    const startingOrder = drawOrder(count, drawSeed)
-    const visibleOrder = [...$('draw-order').querySelectorAll('[data-player]')].map(token => Number(token.dataset.player))
+    const finalOrder = drawSlotsFor(count, mode, manualExclusions, seed[0])
+    const startingOrder = drawSlotsFor(count, mode, manualExclusions, drawSeed)
+    const visibleOrder = [...$('draw-order').querySelectorAll('[data-player]')].map(token => token.dataset.player === 'mort' ? null : Number(token.dataset.player))
     if (visibleOrder.length !== startingOrder.length || visibleOrder.some((id, index) => id !== startingOrder[index])) buildDrawChips(startingOrder, $('draw-order'))
     $('draw-order-title').textContent = drawSeed === null ? 'Ordre initial' : 'Dernier tirage'
     await new Promise(resolve => setTimeout(resolve, 600))
@@ -362,7 +378,7 @@ $('draw').addEventListener('click', async () => {
     while (performance.now() - started < 4500) {
       const shuffled = [...slots]
       const choices = new Uint32Array(count); crypto.getRandomValues(choices)
-      for (let i = count - 1; i > 0; i--) {
+      for (let i = slots.length - 1; i > 0; i--) {
         const j = choices[i] % (i + 1)
         ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
       }
@@ -372,7 +388,8 @@ $('draw').addEventListener('click', async () => {
       await new Promise(resolve => setTimeout(resolve, 70))
     }
     const tokens = new Map([...$('draw-order').querySelectorAll('[data-player]')].map(token => [Number(token.dataset.player), token]))
-    const moves = finalOrder.map((id, index) => [tokens.get(id), slots[index]])
+    const destinations = new Map(slots.map(slot => [Number(slot.dataset.slot), slot]))
+    const moves = finalOrder.flatMap((id, index) => destinations.has(index) ? [[tokens.get(id), destinations.get(index)]] : [])
     await moveDrawPlayers(moves, reduced, Math.max(100, 5000 - (performance.now() - started)))
     drawSeed = seed[0]
     showDrawResult = true
@@ -407,7 +424,7 @@ try {
   const saved = JSON.parse(localStorage.getItem(storageKey))
   if (saved) {
     const savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
-    manualExclusions = Array.isArray(saved.exclusions) ? saved.exclusions : []
+    manualExclusions = normalizeExclusions(saved.count, Array.isArray(saved.exclusions) ? saved.exclusions : [], saved.rounds)
     drawSound = saved.drawSound !== false
     renderSoundToggle()
     drawSeed = Number.isInteger(saved.drawSeed) && saved.drawSeed >= 0 && saved.drawSeed <= 0xffffffff ? saved.drawSeed : null

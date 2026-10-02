@@ -15,19 +15,19 @@
   <title>Rotations tarot</title>
 </head>
 <body>
-  <header class="topbar"><h1><a href="#reglages"><span class="brand-icon" aria-hidden="true">♠</span> Rotations tarot</a></h1></header>
-  <nav class="page-navigation" aria-label="Navigation principale">
-    <a href="#reglages" data-page="reglages">Réglages</a>
-    <a href="#placements" data-page="placements">Placements</a>
-    <a href="#rencontres" data-page="rencontres">Rencontres</a>
-  </nav>
+  <header class="topbar"><h1><a href="#reglages"><span class="brand-icon" aria-hidden="true">♠</span> Rotations tarot</a></h1>
+    <nav class="page-navigation" aria-label="Navigation principale">
+      <a href="#reglages" data-page="reglages" aria-label="Réglages" data-tooltip="Réglages"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></a>
+      <a href="#placements" data-page="placements" aria-label="Placements" data-tooltip="Placements"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a>
+      <a href="#rencontres" data-page="rencontres" aria-label="Rencontres" data-tooltip="Rencontres"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/></svg></a>
+    </nav>
+  </header>
   <main>
     <div class="page-heading"><h2 id="page-title" tabindex="-1">Réglages</h2><p id="tournament-summary"></p></div>
     <section id="setup" class="panel" aria-label="Réglages">
       <form id="setup-form">
         <div class="field-grid"><label>Nombre de joueurs<select id="count"></select></label><label>Nombre de manches<select id="rounds"></select></label></div>
         <fieldset id="mode-field"><legend>Répartition</legend><div id="modes"></div></fieldset>
-        <fieldset id="excluded-field" hidden><legend>Exclus</legend><div id="exclusion-selectors" class="field-grid"></div></fieldset>
         <fieldset class="draw-field"><legend>Première manche</legend>
           <div class="draw-actions"><button id="draw" type="button" class="secondary">Tirer au sort</button><button id="draw-sound" type="button" class="sound-toggle secondary" aria-pressed="true" aria-label="Couper le son du tirage" title="Couper le son"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6.5 6.8 9.5H4.5v5h2.3l3.7 3V6.5Z"/><g class="sound-waves"><path d="M14 9a4.3 4.3 0 0 1 0 6M17 6.5a7.8 7.8 0 0 1 0 11"/></g><path class="sound-slash" d="m14 9 6 6m0-6-6 6"/></svg></button><button id="reset-draw" type="button" class="text-button" hidden>Ordre des numéros</button></div>
           <div id="draw-result" class="draw-result" hidden><h3 id="draw-order-title">Ordre initial</h3><p class="hint">Ordre de lecture : de gauche à droite, puis ligne suivante.</p><div id="draw-order" class="chip-grid"></div></div>
@@ -43,10 +43,11 @@
         <div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active">Par joueur</button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view">Par manche</button></div>
         <div class="placement-navigation"><button id="previous" class="secondary" aria-label="Joueur précédent">←</button><select id="current-placement" aria-label="Joueur"></select><button id="next" class="secondary" aria-label="Joueur suivant">→</button></div>
       </div>
+      <fieldset id="excluded-field" hidden><legend>Choisir les Exclus</legend><div id="exclusion-selectors" class="exclusion-grid"></div></fieldset>
       <div id="player-view" role="tabpanel" aria-labelledby="by-player">
         <div id="player-cards" class="player-grid"></div>
       </div>
-      <div id="round-view" role="tabpanel" aria-labelledby="by-round" hidden><p id="excluded-notice" class="notice" hidden></p><div id="table-cards" class="table-grid"></div></div>
+      <div id="round-view" role="tabpanel" aria-labelledby="by-round" hidden><div id="table-cards" class="table-grid"></div></div>
     </section>
     <section id="encounters" hidden aria-label="Rencontres">
       <p id="encounters-note" class="encounters-note"></p>

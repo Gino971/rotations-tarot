@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createPlan, maxRounds, optionsFor, createOriginalPlan, encountersFor, tableVisitsFor } from './engine.js'
+import { createPlan, maxRounds, optionsFor, createOriginalPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor } from './engine.js'
 import { calculRotationsRainbow } from './movements.js'
 
 function quality(rotations, count, mode) {
@@ -124,4 +124,28 @@ test('draw respects manual exclusions using actual player numbers', () => {
     const ids = plan.rotations[name].flatMap(t => t.joueurs.map(p => p.id))
     assert.equal(ids.length, 12); assert.equal(new Set(ids).size, 12); assert.ok(!ids.includes(excluded))
   }
+})
+
+test('draw display preserves fixed morts at North and the excluded player', () => {
+  for (const count of [6, 9, 10, 11, 15, 21]) for (const seed of [null, 99, 12345]) {
+    const slots = drawSlotsFor(count, 'morts', [], seed)
+    const actual = createPlan(count, 1, 'morts', [], true, seed).rotations['Manche 1'].flatMap(t => t.joueurs.map(p => p.id))
+    assert.deepEqual(slots, actual)
+    assert.equal(slots.filter(id => id === null).length, 4 - count % 4)
+    slots.forEach((id, index) => { if (id === null) assert.equal(index % 4, 0) })
+  }
+  const excluded = drawSlotsFor(13, 'excluded', [7], 99)
+  assert.equal(excluded.at(-1), 7)
+  assert.equal(new Set(excluded).size, 13)
+})
+
+test('draw groups match actual table sizes, including five and six players', () => {
+  for (const count of [5, 6, 7, 9, 11, 13, 15, 21]) {
+    const sizes = drawGroupSizesFor(count, 'mixed')
+    assert.deepEqual(sizes, createPlan(count, 1, 'mixed').rotations['Manche 1'].map(t => t.joueurs.length))
+    assert.equal(sizes.reduce((sum, size) => sum + size, 0), count)
+  }
+  assert.deepEqual(drawGroupSizesFor(9, 'mixed'), [4, 5])
+  assert.deepEqual(drawGroupSizesFor(11, 'mixed'), [5, 6])
+  assert.deepEqual(drawGroupSizesFor(13, 'excluded', [7]), [4, 4, 4, 1])
 })
