@@ -8,6 +8,7 @@ let view = 'player'
 let round = 0
 let selectedPlayer = 0
 let manualExclusions = []
+let drawSeed = null
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
 $('count').value = '16'
@@ -85,7 +86,7 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, view, round, selectedPlayer }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, view, round, selectedPlayer }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
@@ -108,6 +109,8 @@ function showPage(focus = false) {
 }
 
 function showPlan() {
+  $('draw-status').textContent = drawSeed === null ? 'Première manche : ordre des numéros.' : 'Tirage enregistré pour ce tournoi.'
+  $('reset-draw').hidden = drawSeed === null
   $('tournament-summary').textContent = `${plan.count} joueurs · ${plan.rounds} manches · ${optionsFor(plan.count).find(option => option.value === plan.mode).label}`
   renderPlayers(); renderRound(); renderEncounters(); selectView(view); persist(); showPage()
 }
@@ -215,15 +218,22 @@ function selectView(nextView) {
 
 function recalculate() {
   try {
-    plan = createPlan(Number($('count').value), Number($('rounds').value), mode, manualExclusions)
+    plan = createPlan(Number($('count').value), Number($('rounds').value), mode, manualExclusions, true, drawSeed)
     round = Math.min(round, plan.rounds - 1)
     if (selectedPlayer > plan.count) selectedPlayer = 0
     $('error').textContent = ''; showPlan()
   } catch (error) { $('error').textContent = error.message; plan = null; $('tournament-summary').textContent = ''; location.hash = 'reglages'; showPage() }
 }
 
-$('count').addEventListener('change', () => { manualExclusions = []; updateOptions(); recalculate() })
+$('count').addEventListener('change', () => { manualExclusions = []; drawSeed = null; updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
+$('draw').addEventListener('click', () => {
+  const seed = new Uint32Array(1)
+  crypto.getRandomValues(seed)
+  drawSeed = seed[0]
+  recalculate()
+})
+$('reset-draw').addEventListener('click', () => { drawSeed = null; recalculate() })
 $('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate(); if (plan) location.hash = 'placements' })
 window.addEventListener('hashchange', () => showPage(true))
 $('by-player').addEventListener('click', () => selectView('player'))
@@ -244,7 +254,8 @@ try {
   if (saved) {
     const savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
     manualExclusions = Array.isArray(saved.exclusions) ? saved.exclusions : []
-    plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions)
+    drawSeed = Number.isInteger(saved.drawSeed) && saved.drawSeed >= 0 && saved.drawSeed <= 0xffffffff ? saved.drawSeed : null
+    plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed)
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
     view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))
     selectedPlayer = Number.isInteger(saved.selectedPlayer) && saved.selectedPlayer >= 0 && saved.selectedPlayer <= plan.count ? saved.selectedPlayer : 0

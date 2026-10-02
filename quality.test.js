@@ -101,3 +101,27 @@ test('comparison reports actual special table exposure for every player', () => 
     }
   }
 })
+
+test('draw keeps the same balanced schedule with randomly reassigned player numbers', () => {
+  const drawn = createPlan(15, 5, 'morts', [], true, 12345)
+  assert.notDeepEqual(drawn.rotations['Manche 1'], createPlan(15, 5, 'morts').rotations['Manche 1'])
+  assert.deepEqual(drawn, createPlan(15, 5, 'morts', [], true, 12345))
+  assert.ok(encountersFor(drawn).every(row => row.length === 14 && row.every(p => p.times === 1)))
+  assert.ok(tableVisitsFor(drawn).every(v => v.mort === 1))
+  const short = createPlan(15, 3, 'morts', [], true, 12345)
+  for (const name of Object.keys(short.rotations)) assert.deepEqual(short.rotations[name], drawn.rotations[name])
+  for (const tables of Object.values(drawn.rotations)) {
+    assert.deepEqual(tables.flatMap(t => t.joueurs.filter(p => p.id !== null).map(p => p.id)).sort((a,b) => a-b), Array.from({length:15},(_,i)=>i+1))
+    assert.ok(tables.every(t => t.joueurs.slice(1).every(p => p.id !== null)))
+  }
+})
+
+test('draw respects manual exclusions using actual player numbers', () => {
+  const plan = createPlan(13, 3, 'excluded', [2, null, 7], true, 999)
+  assert.deepEqual(plan.excluded, [2, null, 7])
+  assert.deepEqual(plan.rotations['Manche 2'], [])
+  for (const [name, excluded] of [['Manche 1', 2], ['Manche 3', 7]]) {
+    const ids = plan.rotations[name].flatMap(t => t.joueurs.map(p => p.id))
+    assert.equal(ids.length, 12); assert.equal(new Set(ids).size, 12); assert.ok(!ids.includes(excluded))
+  }
+})

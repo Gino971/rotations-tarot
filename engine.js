@@ -85,13 +85,29 @@ export function movementDetails(count, mode) {
   return details
 }
 
-export function createPlan(count, rounds, mode, exclusions = [], optimized = true) {
+function drawOrder(count, seed) {
+  const order = Array.from({ length: count }, (_, i) => i + 1)
+  if (seed === null) return order
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('Tirage invalide.')
+  let state = seed >>> 0
+  for (let i = count - 1; i > 0; i--) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+    const j = Math.floor(state / 4294967296 * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return order
+}
+
+export function createPlan(count, rounds, mode, exclusions = [], optimized = true, drawSeed = null) {
   const option = optionsFor(count).find(option => option.value === mode && !option.disabled)
   if (!option) throw new Error('Choisissez une répartition disponible pour cet effectif.')
   const limit = maxRounds(count, mode)
   if (!Number.isInteger(rounds) || rounds < 1 || rounds > limit) throw new Error(`Ce mouvement permet de 1 à ${limit} manches.`)
   if (!Array.isArray(exclusions)) throw new Error('Choisissez les exclus manche par manche.')
+  const order = drawOrder(count, drawSeed)
+  const relabel = player => player.id === null ? player : { ...player, id: order[player.id - 1], nom: `Joueur ${order[player.id - 1]}` }
   let base = initialPlayers(count, mode)
+  if (mode === 'excluded' && drawSeed !== null) base = base.map(relabel)
   let rotations
   const excluded = []
   if (mode === 'excluded') {
@@ -137,6 +153,9 @@ export function createPlan(count, rounds, mode, exclusions = [], optimized = tru
     }
   }
   if (optimized && (mode === 'morts' || mode === 'mixed')) rotations = optimizeRotations(rotations, count)
+  if (mode !== 'excluded' && drawSeed !== null) {
+    for (const tables of Object.values(rotations)) for (const table of tables) table.joueurs = table.joueurs.map(relabel)
+  }
   return { count, rounds, mode, excluded, rotations }
 }
 
