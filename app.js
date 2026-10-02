@@ -206,6 +206,7 @@ if ('serviceWorker' in navigator) {
     if (previouslyControlled && !refreshing) { refreshing = true; location.reload() }
   })
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(registration => registration.update())
     .then(() => navigator.serviceWorker.ready)
     .then(() => console.info('Mode hors ligne prêt'))
     .catch(() => {})

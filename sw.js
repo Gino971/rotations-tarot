@@ -1,4 +1,4 @@
-const VERSION = 'v9'
+const VERSION = 'v10'
 const PREFIX = `rotations-tarot:${self.registration.scope}:`
 const CACHE = PREFIX + VERSION
 const FILES = ['./', './index.html', './style.css', './app.js', './engine.js', './movements.js', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './manifest.webmanifest']
@@ -11,11 +11,18 @@ self.addEventListener('activate', event => {
 })
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return
-  // Serve the installed app immediately, without waiting for a network timeout.
+  // Refresh cached files whenever the device is online, then fall back to the
+  // installed copy immediately when it is offline.
   event.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(event.request)
-    if (cached) return cached
-    if (event.request.mode === 'navigate') return (await cache.match('./index.html')) || Response.error()
-    return fetch(event.request).catch(() => Response.error())
+    try {
+      const response = await fetch(event.request)
+      if (response.ok) await cache.put(event.request, response.clone())
+      return response
+    } catch {
+      const cached = await cache.match(event.request)
+      if (cached) return cached
+      if (event.request.mode === 'navigate') return (await cache.match('./index.html')) || Response.error()
+      return Response.error()
+    }
   }))
 })
