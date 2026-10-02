@@ -1,0 +1,7 @@
+{
+  "name": "rotations-tarot",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "start": "node serve.mjs", "build": "node build.mjs", "test": "node --test *.test.js" }
+}
