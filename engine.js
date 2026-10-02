@@ -78,7 +78,7 @@ export function movementDetails(count, mode) {
     details.description = describeMoves(base)
     if (exceptions) details.exceptions = exceptions.split(/;\s*(?=Manche\s)/).map(exception => {
       const [round, moves] = exception.split(': ')
-      return `M${round.split(" ")[1]} : ${describeMoves(moves)}`
+      return `Vers M${round.split(" ")[1]} : ${describeMoves(moves)}`
     })
   }
   if (mode === 'morts') details.note = 'Les morts restent au Nord ; les places sont ajustées si nécessaire.'

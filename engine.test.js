@@ -58,8 +58,8 @@ test('movement explanations describe source rules, exceptions and real limits', 
   const special = movementDetails(24, 'normal')
   assert.equal(special.limit, 5)
   assert.match(special.description, /O-1/)
-  assert.deepEqual(special.exceptions, ['M3 : E+3', 'M4 : O-2'])
-  assert.deepEqual(movementDetails(32, 'normal').exceptions, ['M5 : S+2, E+3', 'M6 : E+4'])
+  assert.deepEqual(special.exceptions, ['Vers M3 : E+3', 'Vers M4 : O-2'])
+  assert.deepEqual(movementDetails(32, 'normal').exceptions, ['Vers M5 : S+2, E+3', 'Vers M6 : E+4'])
   assert.equal(movementDetails(32, 'normal').limit, 6)
   for (const [count, limit] of [[12, 6], [16, 5]]) {
     const howell = movementDetails(count, 'normal')
