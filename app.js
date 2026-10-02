@@ -1,4 +1,4 @@
-import { optionsFor, maxRounds, movementNotice, createPlan, positionsFor, seats } from './engine.js'
+import { optionsFor, maxRounds, movementDetails, createPlan, positionsFor, seats } from './engine.js'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -35,8 +35,34 @@ function updateOptions() {
   $('rounds').replaceChildren()
   for (let i = 1; i <= limit; i++) $('rounds').add(new Option(`${i} manche${i > 1 ? 's' : ''}`, i))
   $('rounds').value = String(Math.min(old, limit))
-  $('movement-info').textContent = movementNotice(count, mode)
+  renderMovementDetails(count)
   renderExclusionSelectors()
+}
+
+function renderMovementDetails(count) {
+  const info = movementDetails(count, mode)
+  const container = $('movement-info')
+  container.replaceChildren()
+  const summary = document.createElement('p')
+  summary.className = 'movement-summary'
+  summary.textContent = `${info.tables} table${info.tables > 1 ? 's' : ''} · ${info.limit} rotations maximum${info.limit === 7 ? ' dans l’app' : ''}`
+  const title = document.createElement('strong')
+  title.textContent = info.label
+  const description = document.createElement('p')
+  description.textContent = info.description
+  container.append(summary, title, description)
+  if (info.exceptions.length) {
+    const list = document.createElement('ul')
+    for (const exception of info.exceptions) {
+      const item = document.createElement('li')
+      item.textContent = exception; list.append(item)
+    }
+    container.append(list)
+  }
+  if (info.note) {
+    const note = document.createElement('p')
+    note.textContent = info.note; container.append(note)
+  }
 }
 
 function renderExclusionSelectors() {

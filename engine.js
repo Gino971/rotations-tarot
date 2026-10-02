@@ -34,17 +34,46 @@ export function maxRounds(count, mode) {
   return Object.keys(calculRotationsRainbow(base, 7)).length
 }
 
-export function movementNotice(count, mode) {
-  // Manual exclusions rebuild each round independently, so the limits
-  // of an automatic movement do not apply to this mode.
-  if (mode === 'excluded') return 'Mouvement spécial · exclu choisi à chaque manche'
-  if (mode === 'mixed') return 'Mouvement spécial · rotation Club'
-  const tables = mode === 'morts' ? Math.ceil(count / 4) : count / 4
-  const info = getMovementInfo(tables)
-  let text = tables === 3 || tables === 4 ? 'Mouvement Howell' : info.label === 'Mouvement spécial FFT' ? 'Mouvement spécial' : 'Rotations normales'
+function describeMoves(text) {
+  const names = { N: 'Nord', S: 'Sud', E: 'Est', O: 'Ouest' }
+  return text.split(/[,;]\s*/).map(move => {
+    const [seat, delta] = move.trim().split(/\s+/)
+    const name = names[seat] || seat
+    if (delta === 'fixe') return `${name} reste fixe`
+    const steps = Math.abs(Number(delta))
+    return `${name} ${Number(delta) > 0 ? 'avance' : 'recule'} de ${steps} table${steps > 1 ? 's' : ''}`
+  }).join('. ') + '.'
+}
+
+export function movementDetails(count, mode) {
   const limit = maxRounds(count, mode)
-  if (limit < 7) text += ` · ${limit} manches maximum`
-  return text
+  // Read the actual first-round table layout, including 3/4 and 5/6
+  // exceptions. Manual exclusions have a fixed count of active tables.
+  const tables = mode === 'excluded' ? (count - 1) / 4 : createPlan(count, 1, mode).rotations['Manche 1'].length
+  const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
+  if (mode === 'excluded') {
+    details.label = 'Mouvement spécial · exclu manuel'
+    details.description = 'Choisissez l’exclu de chaque manche selon les résultats. Les placements sont recalculés selon ce choix ; l’exclu n’a pas de place.'
+    return details
+  }
+  if (mode === 'mixed' || tables < 3) {
+    details.label = 'Mouvement Club'
+    details.description = 'À chaque manche, la liste des joueurs est décalée de 5 places en boucle, puis répartie entre les tables. Nord n’est pas fixe.'
+  } else if (tables === 3 || tables === 4) {
+    details.label = 'Mouvement spécial · Howell'
+    details.description = 'Les tables et les positions Nord, Sud, Est et Ouest suivent un plan différent à chaque manche. Nord n’est pas fixe ; consultez le placement indiqué.'
+  } else {
+    const info = getMovementInfo(tables)
+    const [base, exceptions] = info.comment.split(' — Exceptions: ')
+    details.label = info.label === 'Mouvement spécial FFT' ? 'Mouvement spécial' : 'Rotations normales'
+    details.description = describeMoves(base) + ' Les déplacements suivent les numéros de table, en boucle.'
+    if (exceptions) details.exceptions = exceptions.split(/;\s*(?=Manche\s)/).map(exception => {
+      const [round, moves] = exception.split(': ')
+      return `Vers la ${round.toLowerCase()} : ${describeMoves(moves)}`
+    })
+  }
+  if (mode === 'morts') details.note = 'Les morts restent au Nord ; les places sont ajustées si nécessaire.'
+  return details
 }
 
 export function createPlan(count, rounds, mode, exclusions = []) {
