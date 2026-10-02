@@ -9,6 +9,8 @@ let round = 0
 let selectedPlayer = 0
 let manualExclusions = []
 let drawSeed = null
+let drawing = false
+let drawAudio = null
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
 $('count').value = '16'
@@ -86,7 +88,7 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, view, round, selectedPlayer }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, drawSound: $('draw-sound').checked, view, round, selectedPlayer }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
@@ -111,6 +113,7 @@ function showPage(focus = false) {
 function showPlan() {
   $('draw-status').textContent = drawSeed === null ? 'Première manche : ordre des numéros.' : 'Tirage enregistré pour ce tournoi.'
   $('reset-draw').hidden = drawSeed === null
+  renderDrawOrder()
   $('tournament-summary').textContent = `${plan.count} joueurs · ${plan.rounds} manches · ${optionsFor(plan.count).find(option => option.value === plan.mode).label}`
   renderPlayers(); renderRound(); renderEncounters(); selectView(view); persist(); showPage()
 }
@@ -227,11 +230,80 @@ function recalculate() {
 
 $('count').addEventListener('change', () => { manualExclusions = []; drawSeed = null; updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
-$('draw').addEventListener('click', () => {
-  const seed = new Uint32Array(1)
-  crypto.getRandomValues(seed)
-  drawSeed = seed[0]
-  recalculate()
+function renderDrawOrder() {
+  const container = $('draw-order')
+  container.replaceChildren()
+  $('draw-result').hidden = drawSeed === null
+  if (drawSeed === null) return
+  const tables = plan.rotations['Manche 1']
+  if (!tables.length) {
+    const message = document.createElement('p')
+    message.textContent = 'Tirage enregistré. Choisissez l’exclu de la première manche pour afficher les places.'
+    container.append(message); return
+  }
+  for (const table of tables) {
+    const row = document.createElement('div'); row.className = 'draw-table'
+    const title = document.createElement('strong'); title.textContent = `Table ${table.table}`
+    const order = document.createElement('p')
+    order.textContent = table.joueurs.map((player, index) => `${seats[index]} : ${player.id === null ? 'Mort' : `J${player.id}`}`).join(' · ')
+    row.append(title, order); container.append(row)
+  }
+  if (plan.excluded[0]) {
+    const excluded = document.createElement('p'); excluded.textContent = `Exclu : joueur ${plan.excluded[0]}`; container.append(excluded)
+  }
+}
+
+function drawTone(frequency, duration = 0.05, delay = 0) {
+  if (!drawAudio || drawAudio.state !== 'running' || !$('draw-sound').checked) return
+  const oscillator = drawAudio.createOscillator(), volume = drawAudio.createGain()
+  const start = drawAudio.currentTime + delay
+  oscillator.type = 'sine'; oscillator.frequency.value = frequency
+  volume.gain.setValueAtTime(0, start)
+  volume.gain.linearRampToValueAtTime(0.045, start + 0.01)
+  volume.gain.exponentialRampToValueAtTime(0.001, start + duration)
+  oscillator.connect(volume); volume.connect(drawAudio.destination)
+  oscillator.start(start); oscillator.stop(start + duration + 0.02)
+  oscillator.onended = () => { oscillator.disconnect(); volume.disconnect() }
+}
+
+$('draw-sound').addEventListener('change', () => { if (plan) persist() })
+$('draw').addEventListener('click', async () => {
+  if (drawing) return
+  drawing = true
+  const controls = [...$('setup-form').querySelectorAll('button, select, input')].filter(control => control.id !== 'draw-sound')
+  const previous = controls.map(control => control.disabled)
+  controls.forEach(control => { control.disabled = true })
+  $('draw-animation').hidden = false
+  $('draw-result').hidden = true
+  $('draw-status').textContent = 'Tirage en cours…'
+  $('draw').textContent = 'Tirage en cours…'
+  try {
+    if ($('draw-sound').checked) {
+      try {
+        const Audio = window.AudioContext || window.webkitAudioContext
+        if (Audio) { drawAudio ||= new Audio(); await drawAudio.resume() }
+      } catch { /* The visual draw remains available if audio is blocked. */ }
+    }
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const tokens = [...$('draw-animation').querySelectorAll('.draw-tokens span')]
+    const count = Number($('count').value)
+    for (let step = 0; step < (reduced ? 1 : 10); step++) {
+      const values = new Uint32Array(tokens.length); crypto.getRandomValues(values)
+      tokens.forEach((token, index) => { token.textContent = `J${values[index] % count + 1}` })
+      drawTone(350 + step * 35)
+      await new Promise(resolve => setTimeout(resolve, reduced ? 250 : 130 + step * 8))
+    }
+    const seed = new Uint32Array(1); crypto.getRandomValues(seed)
+    drawSeed = seed[0]
+    recalculate()
+    drawTone(523, 0.15); drawTone(659, 0.15, 0.12); drawTone(784, 0.24, 0.24)
+    $('draw-status').textContent = 'Tirage terminé et enregistré.'
+  } finally {
+    drawing = false
+    controls.forEach((control, index) => { control.disabled = previous[index] })
+    $('draw-animation').hidden = true
+    $('draw').textContent = 'Tirer au sort'
+  }
 })
 $('reset-draw').addEventListener('click', () => { drawSeed = null; recalculate() })
 $('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate(); if (plan) location.hash = 'placements' })
@@ -254,6 +326,7 @@ try {
   if (saved) {
     const savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
     manualExclusions = Array.isArray(saved.exclusions) ? saved.exclusions : []
+    $('draw-sound').checked = saved.drawSound !== false
     drawSeed = Number.isInteger(saved.drawSeed) && saved.drawSeed >= 0 && saved.drawSeed <= 0xffffffff ? saved.drawSeed : null
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed)
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()

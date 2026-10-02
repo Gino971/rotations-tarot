@@ -1,4 +1,4 @@
-const VERSION = 'v21'
+const VERSION = 'v22'
 const PREFIX = `rotations-tarot:${self.registration.scope}:`
 const CACHE = PREFIX + VERSION
 const FILES = ['./', './index.html', './style.css', './app.js', './engine.js', './optimizer.js', './movements.js', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './manifest.webmanifest']
