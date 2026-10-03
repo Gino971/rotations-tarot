@@ -1,4 +1,4 @@
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=50'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=51'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -542,11 +542,15 @@ if ('serviceWorker' in navigator) {
   const previouslyControlled = !!navigator.serviceWorker.controller
   let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (previouslyControlled && !refreshing) { refreshing = true; location.reload() }
+    if (previouslyControlled && navigator.onLine && !refreshing) { refreshing = true; location.reload() }
   })
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-    .then(registration => registration.update())
-    .then(() => navigator.serviceWorker.ready)
-    .then(() => console.info('Mode hors ligne prêt'))
-    .catch(() => {})
+    .then(async registration => {
+      // A failed update must not hide the readiness of an installed offline copy.
+      registration.update().catch(() => {})
+      await navigator.serviceWorker.ready
+      $('offline-status').textContent = 'Disponible hors ligne'
+      navigator.storage?.persist?.().catch(() => {})
+    })
+    .catch(() => { $('offline-status').textContent = 'Ouvrir une fois avec Internet pour préparer le mode hors ligne.' })
 }

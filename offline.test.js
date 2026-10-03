@@ -18,7 +18,11 @@ function worker({ online = false } = {}) {
       if (!stores.has(name)) stores.set(name, new Map())
       const entries = stores.get(name)
       return {
-        async addAll(files) { for (const file of files) entries.set(key(file), `cached:${file}`) },
+        async addAll(files) { for (const file of files) {
+          assert.equal(file.cache, 'reload')
+          const relative = './' + file.url.slice(scope.length)
+          entries.set(key(file), `cached:${relative}`)
+        } },
         async match(request) { const body = entries.get(key(request)); return body === undefined ? undefined : new Response(body) },
         async put(request, response) { entries.set(key(request), await response.text()) }
       }
@@ -32,9 +36,10 @@ function worker({ online = false } = {}) {
       addEventListener(name, handler) { events.set(name, handler) },
       async skipWaiting() { skipped = true }, clients: { async claim() { claimed = true } }
     },
-    caches, URL, Response,
+    caches, URL, Response, Request,
     async fetch(request) {
       networkCalls++
+      if (online === 'hanging') return new Promise(() => {})
       if (!online) throw new Error('Network offline')
       return new Response(`network:${key(request)}`)
     }
@@ -72,7 +77,7 @@ test('installed app and modules reopen from cache when the network is unavailabl
     assert.equal(response.status, 200)
     assert.equal(await response.text(), `cached:${filename === './' ? './' : './' + filename}`)
   }
-  assert.equal(app.networkCalls, 7)
+  assert.equal(app.networkCalls, 0)
 })
 
 test('navigation with a query uses the cached app under its repository path', async () => {
@@ -80,17 +85,28 @@ test('navigation with a query uses the cached app under its repository path', as
   await app.lifecycle('install')
   const response = await app.request('./?installed=1', 'navigate')
   assert.equal(await response.text(), 'cached:./index.html')
-  assert.equal(app.networkCalls, 1)
+  assert.equal(app.networkCalls, 0)
 })
 
-test('online requests refresh old cached application files', async () => {
+test('installed files start locally even when online, keeping a consistent version', async () => {
   const app = worker({ online: true })
   await app.lifecycle('install')
   const response = await app.request('engine.js')
-  const url = new URL('engine.js', app.scope).href
-  assert.equal(await response.text(), `network:${url}`)
-  const entries = [...app.stores.values()][0]
-  assert.equal(entries.get(url), `network:${url}`)
+  assert.equal(await response.text(), 'cached:./engine.js')
+  assert.equal(app.networkCalls, 0)
+})
+
+test('a network that never responds cannot delay an installed app', async () => {
+  const app = worker({ online: 'hanging' })
+  await app.lifecycle('install')
+  const response = await app.request('./?iphone=1', 'navigate')
+  assert.equal(await response.text(), 'cached:./index.html')
+  const index = await readFile(new URL('./index.html', import.meta.url), 'utf8')
+  const main = await readFile(new URL('./app.js', import.meta.url), 'utf8')
+  const script = index.match(/src="(app\.js[^"]*)"/)[1]
+  const engine = main.match(/from '\.\/(engine\.js[^']*)'/)[1]
+  for (const asset of [script, engine]) assert.equal((await app.request(asset)).status, 200)
+  assert.equal(app.networkCalls, 0)
 })
 
 test('activation preserves the caches of other apps and scopes', async () => {
