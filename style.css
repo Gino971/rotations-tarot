@@ -53,3 +53,7 @@
 #results #excluded-field{margin:0 0 22px;padding:14px 16px;background:#edf1e7;border-radius:12px}.exclusion-grid .current-round{color:var(--green);font-weight:750}.exclusion-grid .current-round select{border-color:var(--green);background:#fffdf6}
 
 .exclusion-grid label{width:78px;white-space:nowrap}.exclusion-grid select{font-size:14px}
+
+.draw-actions{flex-wrap:nowrap;gap:8px}.draw-actions>#draw,.draw-actions>#reset-draw{font-size:14px;padding:10px 12px;white-space:nowrap;min-height:46px}.draw-actions>.sound-toggle{flex-shrink:0}.draw-result{margin-top:14px}@media(max-width:360px){.draw-actions{gap:5px}.draw-actions>#draw,.draw-actions>#reset-draw{padding:10px 8px;font-size:13px}}
+
+.chip-slot[data-slot] .draw-chip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}.chip-drag-source{opacity:.35}.chip-drop-target,.chip-selected{outline:3px solid #315b4e;outline-offset:3px}.chip-drag-ghost{position:fixed!important;z-index:1000;pointer-events:none;transform:translate(-50%,-50%);opacity:.95;cursor:grabbing}.draw-chip:focus-visible{outline:3px solid #315b4e;outline-offset:3px}

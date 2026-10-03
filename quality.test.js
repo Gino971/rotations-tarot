@@ -149,3 +149,16 @@ test('draw groups match actual table sizes, including five and six players', () 
   assert.deepEqual(drawGroupSizesFor(11, 'mixed'), [5, 6])
   assert.deepEqual(drawGroupSizesFor(13, 'excluded', [7]), [4, 4, 4, 1])
 })
+
+test('manual player order changes placements while preserving balanced encounters', () => {
+  const order = Array.from({length:15},(_,i)=>i+1)
+  ;[order[0],order[7]]=[order[7],order[0]]
+  const p = createPlan(15,5,'morts',[],true,null,order)
+  assert.ok(encountersFor(p).every(row=>row.length===14 && row.every(x=>x.times===1)))
+  assert.ok(tableVisitsFor(p).every(v=>v.mort===1))
+  assert.deepEqual(drawSlotsFor(15,'morts',[],null,order),p.rotations['Manche 1'].flatMap(t=>t.joueurs.map(x=>x.id)))
+  assert.equal(p.rotations['Manche 1'][0].joueurs[0].id,8)
+  assert.throws(()=>createPlan(15,5,'morts',[],true,null,Array(15).fill(1)),/invalide/)
+  const excluded = createPlan(13,3,'excluded',[2,4,6],true,null,Array.from({length:13},(_,i)=>13-i))
+  assert.ok(excluded.rotations['Manche 1'].every(t=>t.joueurs.every(p=>p.id!==2)))
+})

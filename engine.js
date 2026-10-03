@@ -98,16 +98,17 @@ export function drawOrder(count, seed) {
   return order
 }
 
-export function createPlan(count, rounds, mode, exclusions = [], optimized = true, drawSeed = null) {
+export function createPlan(count, rounds, mode, exclusions = [], optimized = true, drawSeed = null, manualOrder = null) {
   const option = optionsFor(count).find(option => option.value === mode && !option.disabled)
   if (!option) throw new Error('Choisissez une répartition disponible pour cet effectif.')
   const limit = maxRounds(count, mode)
   if (!Number.isInteger(rounds) || rounds < 1 || rounds > limit) throw new Error(`Ce mouvement permet de 1 à ${limit} manches.`)
   if (!Array.isArray(exclusions)) throw new Error('Choisissez les exclus manche par manche.')
-  const order = drawOrder(count, drawSeed)
+  if (manualOrder !== null && (!Array.isArray(manualOrder) || manualOrder.length !== count || new Set(manualOrder).size !== count || manualOrder.some(id => !Number.isInteger(id) || id < 1 || id > count))) throw new Error('Placement manuel invalide.')
+  const order = manualOrder === null ? drawOrder(count, drawSeed) : manualOrder
   const relabel = player => player.id === null ? player : { ...player, id: order[player.id - 1], nom: `Joueur ${order[player.id - 1]}` }
   let base = initialPlayers(count, mode)
-  if (mode === 'excluded' && drawSeed !== null) base = base.map(relabel)
+  if (mode === 'excluded' && (drawSeed !== null || manualOrder !== null)) base = base.map(relabel)
   let rotations
   const excluded = []
   if (mode === 'excluded') {
@@ -156,7 +157,7 @@ export function createPlan(count, rounds, mode, exclusions = [], optimized = tru
     }
   }
   if (optimized && (mode === 'morts' || mode === 'mixed')) rotations = optimizeRotations(rotations, count)
-  if (mode !== 'excluded' && drawSeed !== null) {
+  if (mode !== 'excluded' && (drawSeed !== null || manualOrder !== null)) {
     for (const tables of Object.values(rotations)) for (const table of tables) table.joueurs = table.joueurs.map(relabel)
   }
   return { count, rounds, mode, excluded, rotations }
@@ -203,9 +204,9 @@ export function tableVisitsFor(plan) {
   return visits
 }
 
-export function drawSlotsFor(count, mode, exclusions = [], seed = null) {
-  const first = createPlan(count, 1, mode, exclusions, true, seed)
-  if (mode === 'excluded' && first.excluded[0] === null) return drawOrder(count, seed)
+export function drawSlotsFor(count, mode, exclusions = [], seed = null, manualOrder = null) {
+  const first = createPlan(count, 1, mode, exclusions, true, seed, manualOrder)
+  if (mode === 'excluded' && first.excluded[0] === null) return manualOrder === null ? drawOrder(count, seed) : [...manualOrder]
   const order = first.rotations['Manche 1'].flatMap(table => table.joueurs.map(player => player.id))
   if (first.excluded[0]) order.push(first.excluded[0])
   return order
