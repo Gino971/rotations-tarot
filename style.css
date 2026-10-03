@@ -57,3 +57,5 @@
 .draw-actions{flex-wrap:nowrap;gap:8px}.draw-actions>#draw,.draw-actions>#reset-draw{font-size:14px;padding:10px 12px;white-space:nowrap;min-height:46px}.draw-actions>.sound-toggle{flex-shrink:0}.draw-result{margin-top:14px}@media(max-width:360px){.draw-actions{gap:5px}.draw-actions>#draw,.draw-actions>#reset-draw{padding:10px 8px;font-size:13px}}
 
 .chip-slot[data-slot] .draw-chip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}.chip-drag-source{opacity:.35}.chip-drop-target,.chip-selected{outline:3px solid #315b4e;outline-offset:3px}.chip-drag-ghost{position:fixed!important;z-index:1000;pointer-events:none;transform:translate(-50%,-50%);opacity:.95;cursor:grabbing}.draw-chip:focus-visible{outline:3px solid #315b4e;outline-offset:3px}
+
+#table-cards [data-slot] .draw-player{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}#table-cards .draw-player:focus-visible{outline:3px solid #c5a058;outline-offset:3px}

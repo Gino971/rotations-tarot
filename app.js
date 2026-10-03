@@ -1,4 +1,4 @@
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=49'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=50'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -298,13 +298,15 @@ function exchangeChips(firstId, secondId) {
   recalculate()
 }
 
-$('draw-order').addEventListener('pointerdown', event => {
-  const chip = event.target.closest('.draw-chip')
+function startChipDrag(event) {
+  const chip = event.target.closest('.draw-player')
   if (drawing || chipDrag || !chip || !chip.parentElement.hasAttribute('data-slot') || event.button !== 0) return
   event.preventDefault()
-  chipDrag = { chip, id: Number(chip.dataset.player), pointer: event.pointerId, x: event.clientX, y: event.clientY, ghost: null, target: null }
+  chipDrag = { container: event.currentTarget, chip, id: Number(chip.dataset.player), pointer: event.pointerId, x: event.clientX, y: event.clientY, ghost: null, target: null }
   chip.setPointerCapture(event.pointerId)
-})
+}
+$('draw-order').addEventListener('pointerdown', startChipDrag)
+$('table-cards').addEventListener('pointerdown', startChipDrag)
 document.addEventListener('pointermove', event => {
   if (!chipDrag || event.pointerId !== chipDrag.pointer) return
   if (!chipDrag.ghost && Math.hypot(event.clientX - chipDrag.x, event.clientY - chipDrag.y) < 6) return
@@ -321,9 +323,9 @@ document.addEventListener('pointermove', event => {
 function chipDropTarget(x, y, source) {
   // Accept the entire destination slot, including its symbol, number and label.
   // Hit-testing geometry also avoids pointer-capture and floating-clone issues.
-  for (const slot of $('draw-order').querySelectorAll('[data-slot]')) {
+  for (const slot of chipDrag.container.querySelectorAll('[data-slot]')) {
     const bounds = slot.getBoundingClientRect()
-    const token = slot.querySelector('.draw-chip')
+    const token = slot.querySelector('.draw-player')
     if (token !== source && x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom) return token
   }
   return null
@@ -344,7 +346,7 @@ document.addEventListener('pointerup', endChipDrag)
 document.addEventListener('pointercancel', endChipDrag)
 function clearChipSelection() {
   selectedChip = null
-  for (const chip of $('draw-order').querySelectorAll('.chip-selected')) {
+  for (const chip of document.querySelectorAll('#draw-order .chip-selected, #table-cards .chip-selected')) {
     chip.classList.remove('chip-selected')
     chip.setAttribute('aria-pressed', 'false')
   }
@@ -363,17 +365,20 @@ function selectChipForExchange(chip) {
     chip.setAttribute('aria-pressed', 'true')
   }
 }
-$('draw-order').addEventListener('keydown', event => {
-  const chip = event.target.closest('.draw-chip')
+function handleChipKey(event) {
+  const chip = event.target.closest('.draw-player')
   if (event.key === 'Escape') { clearChipSelection(); return }
   if (drawing || !chip || !chip.parentElement.hasAttribute('data-slot') || !['Enter', ' '].includes(event.key)) return
   event.preventDefault()
   const id = Number(chip.dataset.player)
   selectChipForExchange(chip)
-  $('draw-order').querySelector(`[data-player="${id}"]`)?.focus()
-})
+  event.currentTarget.querySelector(`[data-player="${id}"]`)?.focus()
+}
+$('draw-order').addEventListener('keydown', handleChipKey)
+$('table-cards').addEventListener('keydown', handleChipKey)
 
 function buildDrawTables(tables, container) {
+  clearChipSelection()
   container.replaceChildren()
   for (const table of tables) {
     const card = document.createElement('article'); card.className = 'table-card'
@@ -385,7 +390,11 @@ function buildDrawTables(tables, container) {
       const label = document.createElement('small'); label.textContent = seats[index]
       const token = document.createElement('strong'); token.className = 'draw-player'
       token.textContent = player.id === null ? 'Mort' : `J${player.id}`
-      if (player.id !== null) { seat.dataset.slot = `${table.table}:${index}`; token.dataset.player = player.id }
+      if (player.id !== null && round === 0) {
+        seat.dataset.slot = `${table.table}:${index}`; token.dataset.player = player.id
+        token.tabIndex = 0; token.setAttribute('role', 'button'); token.setAttribute('aria-label', `Joueur ${player.id}`)
+        token.setAttribute('aria-pressed', 'false'); token.title = 'Toucher deux joueurs ou les faire glisser pour échanger les places'
+      }
       seat.append(label, token); (index < 4 ? layout : extras).append(seat)
     }
     const center = document.createElement('span'); center.className = 'table-center'; center.setAttribute('aria-hidden', 'true')
