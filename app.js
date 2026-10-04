@@ -1,4 +1,4 @@
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=51'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=52'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -17,6 +17,98 @@ let drawAudio = null
 let drawSound = true
 let showDrawResult = false
 const chipSuits = new Map()
+let luckyRemoved = new Set()
+let luckyStarted = false
+let luckyTimer = null
+let luckyCount = 0
+let luckyLastRemoved = null
+
+function luckyPlayers() {
+  return Array.from({ length: plan.count }, (_, index) => index + 1).filter(id => !luckyRemoved.has(id))
+}
+
+function pauseLucky() {
+  clearTimeout(luckyTimer)
+  luckyTimer = null
+}
+
+function luckyChip(id, interactive = true) {
+  const chip = document.createElement(interactive ? 'button' : 'div')
+  chip.className = 'draw-chip lucky-chip'
+  if (interactive) {
+    chip.type = 'button'
+    chip.dataset.luckyPlayer = id
+    chip.classList.toggle('lucky-removed', luckyRemoved.has(id))
+    chip.setAttribute('aria-pressed', String(!luckyRemoved.has(id)))
+    chip.setAttribute('aria-label', `Joueur ${id} : ${luckyRemoved.has(id) ? 'réintégrer' : 'retirer du tirage'}`)
+    chip.title = luckyRemoved.has(id) ? 'Réintégrer au tirage' : 'Retirer du tirage'
+  } else chip.setAttribute('aria-label', `Jeton du joueur ${id}`)
+  const suit = chipSuits.get(id) || ['♠', '♥', '♦', '♣'][(id - 1) % 4]
+  const symbol = document.createElement('span')
+  symbol.className = `chip-suit ${suit === '♥' || suit === '♦' ? 'red' : 'black'}`
+  symbol.textContent = suit; symbol.setAttribute('aria-hidden', 'true')
+  const number = document.createElement('span'); number.className = 'chip-number'; number.textContent = id
+  chip.append(symbol, number)
+  return chip
+}
+
+function renderLucky() {
+  if (!plan) return
+  if (luckyCount !== plan.count) {
+    pauseLucky(); luckyCount = plan.count; luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null
+  }
+  const remaining = luckyPlayers()
+  const finished = luckyStarted && remaining.length === 1
+  if (remaining.length <= 1) pauseLucky()
+  $('lucky-start').textContent = luckyTimer !== null ? 'Mettre en pause' : luckyStarted && remaining.length > 1 ? 'Continuer le tirage' : 'Lancer le tirage'
+  $('lucky-start').disabled = remaining.length < 2
+  $('lucky-status').textContent = finished ? 'Tirage terminé !' : `${remaining.length} jeton${remaining.length > 1 ? 's' : ''} en jeu sur ${plan.count}.${luckyLastRemoved !== null ? ` Dernier jeton retiré : N° ${luckyLastRemoved}.` : ''}${remaining.length === 0 ? ' Réintégrez des jetons pour lancer le tirage.' : ''}`
+  $('lucky-winner').hidden = !finished
+  $('lucky-winner-chip').replaceChildren()
+  if (finished) {
+    $('lucky-winner-title').textContent = `Le chanceux est le N° ${remaining[0]}`
+    $('lucky-winner-chip').append(luckyChip(remaining[0], false))
+  }
+  const focused = document.activeElement?.dataset.luckyPlayer
+  $('lucky-chips').replaceChildren(...Array.from({ length: plan.count }, (_, index) => luckyChip(index + 1)))
+  if (focused) $('lucky-chips').querySelector(`[data-lucky-player="${focused}"]`)?.focus({ preventScroll: true })
+}
+
+function scheduleLucky() {
+  luckyTimer = setTimeout(() => {
+    const remaining = luckyPlayers()
+    if (remaining.length > 1) {
+      // Rejection sampling keeps every remaining jeton equally likely.
+      const random = new Uint32Array(1)
+      const limit = Math.floor(0x100000000 / remaining.length) * remaining.length
+      do { crypto.getRandomValues(random) } while (random[0] >= limit)
+      luckyLastRemoved = remaining[random[0] % remaining.length]
+      luckyRemoved.add(luckyLastRemoved)
+    }
+    if (luckyPlayers().length > 1) scheduleLucky()
+    else pauseLucky()
+    renderLucky(); persist()
+  }, Math.max(80, Math.min(700, 16000 / luckyPlayers().length)))
+}
+
+$('lucky-start').addEventListener('click', () => {
+  if (luckyTimer !== null) pauseLucky()
+  else if (luckyPlayers().length > 1) { luckyStarted = true; scheduleLucky() }
+  renderLucky(); persist()
+})
+$('lucky-reset').addEventListener('click', () => {
+  pauseLucky(); luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null
+  renderLucky(); persist()
+})
+$('lucky-chips').addEventListener('click', event => {
+  const chip = event.target.closest('[data-lucky-player]')
+  if (!chip) return
+  const id = Number(chip.dataset.luckyPlayer)
+  if (luckyRemoved.has(id)) luckyRemoved.delete(id)
+  else luckyRemoved.add(id)
+  luckyLastRemoved = null
+  renderLucky(); persist()
+})
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
 $('count').value = '16'
@@ -98,11 +190,11 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, drawSound: drawSound, view, round, selectedPlayer }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
-const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres' }
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage Chanceux' }
 
 function showPage(focus = false) {
   const requested = location.hash.slice(1)
@@ -111,6 +203,8 @@ function showPage(focus = false) {
   $('setup').hidden = page !== 'reglages'
   $('results').hidden = page !== 'placements'
   $('encounters').hidden = page !== 'rencontres'
+  $('lucky').hidden = page !== 'chanceux'
+  if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
   $('page-title').textContent = pages[page]
   document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
@@ -124,7 +218,7 @@ function showPlan() {
   $('draw-status').textContent = manualDrawOrder !== null ? 'Placement manuel enregistré.' : drawSeed === null ? 'Première manche : ordre des numéros.' : 'Tirage enregistré pour ce tournoi.'
   renderDrawOrder()
   $('tournament-summary').textContent = `${plan.count} joueurs · ${plan.rounds} manches · ${optionsFor(plan.count).find(option => option.value === plan.mode).label}`
-  renderPlayers(); renderRound(); renderEncounters(); selectView(view); persist(); showPage()
+  renderPlayers(); renderRound(); renderEncounters(); renderLucky(); selectView(view); persist(); showPage()
 }
 
 function renderEncounters() {
@@ -532,6 +626,9 @@ try {
     manualDrawOrder = Array.isArray(saved.manualDrawOrder) && saved.manualDrawOrder.length === saved.count && new Set(saved.manualDrawOrder).size === saved.count && saved.manualDrawOrder.every(id => Number.isInteger(id) && id >= 1 && id <= saved.count) ? saved.manualDrawOrder : null
     showDrawResult = drawSeed !== null || manualDrawOrder !== null
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed, manualDrawOrder)
+    luckyCount = plan.count
+    luckyRemoved = new Set(Array.isArray(saved.luckyRemoved) ? saved.luckyRemoved.filter(id => Number.isInteger(id) && id >= 1 && id <= plan.count) : [])
+    luckyStarted = saved.luckyStarted === true
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
     view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))
     selectedPlayer = Number.isInteger(saved.selectedPlayer) && saved.selectedPlayer >= 0 && saved.selectedPlayer <= plan.count ? saved.selectedPlayer : 0
