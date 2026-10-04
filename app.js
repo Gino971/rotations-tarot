@@ -1,4 +1,4 @@
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=52'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=66'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -22,12 +22,53 @@ let luckyStarted = false
 let luckyTimer = null
 let luckyCount = 0
 let luckyLastRemoved = null
+let luckySound = true
+let luckyWinner = null
+let luckyTarget = 1
+// Reserve 1.3 seconds for the final reveal within the 15-second budget.
+let luckyBudget = 13700
+let luckySegmentStart = null
+
+function prepareLuckyAudio() {
+  if (!luckySound) return
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext
+    if (Audio) { drawAudio ||= new Audio(); drawAudio.resume().catch(() => {}) }
+  } catch { /* Animation remains available when audio is blocked. */ }
+}
+
+function renderLuckySound() {
+  $('lucky-sound-label').textContent = luckySound ? 'Son actif' : 'Son coupé'
+  const button = $('lucky-sound')
+  button.setAttribute('aria-pressed', String(luckySound))
+  button.setAttribute('aria-label', luckySound ? 'Couper le son du tirage' : 'Activer le son du tirage')
+  button.title = luckySound ? 'Couper le son' : 'Activer le son'
+}
+
+$('lucky-sound').addEventListener('click', () => {
+  luckySound = !luckySound
+  renderLuckySound(); prepareLuckyAudio(); persist()
+})
+
+function animateLuckyRemoval(id) {
+  const chip = $('lucky-chips').querySelector(`[data-lucky-player="${id}"]`)
+  chip?.classList.add('lucky-leaving')
+  if (chip && luckyStarted) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) chip.remove()
+    else chip.addEventListener('animationend', () => chip.remove(), { once: true })
+  }
+  drawTone(260 + luckyPlayers().length % 8 * 45, 0.1, 0, luckySound)
+}
 
 function luckyPlayers() {
   return Array.from({ length: plan.count }, (_, index) => index + 1).filter(id => !luckyRemoved.has(id))
 }
 
 function pauseLucky() {
+  if (luckySegmentStart !== null) {
+    luckyBudget = Math.max(0, luckyBudget - (performance.now() - luckySegmentStart))
+    luckySegmentStart = null
+  }
   clearTimeout(luckyTimer)
   luckyTimer = null
 }
@@ -35,13 +76,15 @@ function pauseLucky() {
 function luckyChip(id, interactive = true) {
   const chip = document.createElement(interactive ? 'button' : 'div')
   chip.className = 'draw-chip lucky-chip'
+  chip.style.setProperty('--lucky-delay', `${(id % 7) * -0.17}s`)
   if (interactive) {
     chip.type = 'button'
+    chip.disabled = luckyStarted
     chip.dataset.luckyPlayer = id
     chip.classList.toggle('lucky-removed', luckyRemoved.has(id))
     chip.setAttribute('aria-pressed', String(!luckyRemoved.has(id)))
-    chip.setAttribute('aria-label', `Joueur ${id} : ${luckyRemoved.has(id) ? 'réintégrer' : 'retirer du tirage'}`)
-    chip.title = luckyRemoved.has(id) ? 'Réintégrer au tirage' : 'Retirer du tirage'
+    chip.setAttribute('aria-label', luckyStarted ? `Joueur ${id}` : `Joueur ${id} : ${luckyRemoved.has(id) ? 'réintégrer' : 'retirer du tirage'}`)
+    chip.title = luckyStarted ? `Joueur ${id}` : luckyRemoved.has(id) ? 'Réintégrer au tirage' : 'Retirer du tirage'
   } else chip.setAttribute('aria-label', `Jeton du joueur ${id}`)
   const suit = chipSuits.get(id) || ['♠', '♥', '♦', '♣'][(id - 1) % 4]
   const symbol = document.createElement('span')
@@ -52,62 +95,111 @@ function luckyChip(id, interactive = true) {
   return chip
 }
 
-function renderLucky() {
+function renderLucky(leavingId = null) {
   if (!plan) return
   if (luckyCount !== plan.count) {
-    pauseLucky(); luckyCount = plan.count; luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null
+    pauseLucky(); luckyCount = plan.count; luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null; luckyBudget = 13700
   }
   const remaining = luckyPlayers()
-  const finished = luckyStarted && remaining.length === 1
-  if (remaining.length <= 1) pauseLucky()
-  $('lucky-start').textContent = luckyTimer !== null ? 'Mettre en pause' : luckyStarted && remaining.length > 1 ? 'Continuer le tirage' : 'Lancer le tirage'
-  $('lucky-start').disabled = remaining.length < 2
+  if (!luckyStarted) luckyTarget = Math.min(luckyTarget, Math.max(1, remaining.length))
+  const selector = $('lucky-target')
+  const limit = luckyStarted ? plan.count : Math.max(1, remaining.length)
+  selector.replaceChildren()
+  for (let i = 1; i <= limit; i++) selector.add(new Option(String(i), i))
+  selector.value = String(luckyTarget)
+  selector.disabled = luckyStarted
+  const finished = luckyStarted && remaining.length === luckyTarget
+  if (remaining.length <= luckyTarget) pauseLucky()
+  const startLabel = luckyTimer !== null ? 'Mettre en pause' : luckyStarted && remaining.length > luckyTarget ? 'Continuer le tirage' : 'Lancer le tirage'
+  $('lucky-start').setAttribute('aria-label', startLabel)
+  $('lucky-start').title = startLabel
+  $('lucky-start-label').textContent = luckyTimer !== null ? 'Pause' : luckyStarted && !finished ? 'Reprendre' : 'Lancer'
+  $('lucky-start').classList.toggle('is-playing', luckyTimer !== null)
+  $('lucky-start').disabled = remaining.length < luckyTarget || finished
   $('lucky-status').textContent = finished ? 'Tirage terminé !' : `${remaining.length} jeton${remaining.length > 1 ? 's' : ''} en jeu sur ${plan.count}.${luckyLastRemoved !== null ? ` Dernier jeton retiré : N° ${luckyLastRemoved}.` : ''}${remaining.length === 0 ? ' Réintégrez des jetons pour lancer le tirage.' : ''}`
+  $('lucky').classList.toggle('lucky-running', luckyTimer !== null)
+  $('lucky').classList.toggle('lucky-suspense', luckyStarted && !finished && remaining.length <= luckyTarget + 4)
+  const winner = finished ? remaining.join(',') : null
+  const newWinner = winner !== null && winner !== luckyWinner
+  luckyWinner = winner
+  $('lucky-winner').classList.toggle('lucky-reveal', newWinner)
   $('lucky-winner').hidden = !finished
+  $('lucky-chips').hidden = finished
   $('lucky-winner-chip').replaceChildren()
   if (finished) {
-    $('lucky-winner-title').textContent = `Le chanceux est le N° ${remaining[0]}`
-    $('lucky-winner-chip').append(luckyChip(remaining[0], false))
+    $('lucky-winner-title').textContent = luckyTarget === 1 ? `Le chanceux est le N° ${remaining[0]}` : `Les ${luckyTarget} chanceux sont les N° ${remaining.join(', ')}`
+    $('lucky-winner-chip').append(...remaining.map(id => luckyChip(id, false)))
+    if (newWinner) {
+      drawTone(523, 0.18, 0, luckySound); drawTone(659, 0.18, 0.16, luckySound)
+      drawTone(784, 0.22, 0.32, luckySound); drawTone(1047, 0.55, 0.5, luckySound)
+      $('lucky-winner').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' })
+    }
   }
   const focused = document.activeElement?.dataset.luckyPlayer
-  $('lucky-chips').replaceChildren(...Array.from({ length: plan.count }, (_, index) => luckyChip(index + 1)))
+  const visible = Array.from({ length: plan.count }, (_, index) => index + 1).filter(id => !luckyStarted || !luckyRemoved.has(id) || id === leavingId)
+  $('lucky-chips').replaceChildren(...visible.map(id => luckyChip(id)))
   if (focused) $('lucky-chips').querySelector(`[data-lucky-player="${focused}"]`)?.focus({ preventScroll: true })
 }
 
 function scheduleLucky() {
+  const elapsed = performance.now() - luckySegmentStart
+  const left = Math.max(0, luckyBudget - elapsed)
+  const excess = luckyPlayers().length - luckyTarget
+  // Reserve time for the last four removals, with progressively longer pauses.
+  const finale = 4440
+  const desired = excess <= 4 ? 1500 - (excess - 1) * 260 : Math.min(180, Math.max(0, left - finale) / (excess - 4))
+  const finalWeights = excess <= 4 ? Array.from({ length: excess }, (_, i) => 1500 - i * 260).reduce((sum, value) => sum + value, 0) : 0
+  const delay = excess <= 4 ? Math.min(desired, left * desired / finalWeights) : desired
   luckyTimer = setTimeout(() => {
     const remaining = luckyPlayers()
-    if (remaining.length > 1) {
-      // Rejection sampling keeps every remaining jeton equally likely.
+    const timeLeft = Math.max(0, luckyBudget - (performance.now() - luckySegmentStart))
+    const extra = remaining.length - luckyTarget
+    const toRemove = timeLeft <= 0 ? extra : extra <= 4 ? 1 : Math.min(extra - 4, Math.max(1, Math.ceil((extra - 4) * 150 / Math.max(150, timeLeft - finale + 150))))
+    for (let i = 0; i < toRemove; i++) {
       const random = new Uint32Array(1)
       const limit = Math.floor(0x100000000 / remaining.length) * remaining.length
       do { crypto.getRandomValues(random) } while (random[0] >= limit)
-      luckyLastRemoved = remaining[random[0] % remaining.length]
+      const index = random[0] % remaining.length
+      luckyLastRemoved = remaining.splice(index, 1)[0]
       luckyRemoved.add(luckyLastRemoved)
     }
-    if (luckyPlayers().length > 1) scheduleLucky()
+    if (remaining.length > luckyTarget) scheduleLucky()
     else pauseLucky()
-    renderLucky(); persist()
-  }, Math.max(80, Math.min(700, 16000 / luckyPlayers().length)))
+    renderLucky(luckyLastRemoved); animateLuckyRemoval(luckyLastRemoved); persist()
+  }, Math.max(0, delay))
 }
+
+$('lucky-target').addEventListener('change', () => {
+  if (luckyStarted) return
+  luckyTarget = Number($('lucky-target').value)
+  renderLucky(); persist()
+})
 
 $('lucky-start').addEventListener('click', () => {
   if (luckyTimer !== null) pauseLucky()
-  else if (luckyPlayers().length > 1) { luckyStarted = true; scheduleLucky() }
+  else if (luckyPlayers().length >= luckyTarget) {
+    prepareLuckyAudio(); luckyStarted = true
+    if (luckyPlayers().length > luckyTarget) { luckySegmentStart = performance.now(); scheduleLucky() }
+  }
   renderLucky(); persist()
 })
 $('lucky-reset').addEventListener('click', () => {
-  pauseLucky(); luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null
+  pauseLucky(); luckyRemoved.clear(); luckyStarted = false; luckyLastRemoved = null; luckyBudget = 13700
   renderLucky(); persist()
 })
 $('lucky-chips').addEventListener('click', event => {
+  if (luckyStarted) return
   const chip = event.target.closest('[data-lucky-player]')
   if (!chip) return
   const id = Number(chip.dataset.luckyPlayer)
-  if (luckyRemoved.has(id)) luckyRemoved.delete(id)
-  else luckyRemoved.add(id)
+  const removing = !luckyRemoved.has(id)
+  if (removing) luckyRemoved.add(id)
+  else luckyRemoved.delete(id)
   luckyLastRemoved = null
-  renderLucky(); persist()
+  prepareLuckyAudio(); renderLucky()
+  if (removing) animateLuckyRemoval(id)
+  else $('lucky-chips').querySelector(`[data-lucky-player="${id}"]`)?.classList.add('lucky-returning')
+  persist()
 })
 
 for (let count = 4; count <= 400; count++) $('count').add(new Option(`${count} joueurs`, count))
@@ -190,11 +282,11 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted, luckySound, luckyTarget, luckyBudget: Math.max(0, luckyBudget - (luckySegmentStart === null ? 0 : performance.now() - luckySegmentStart)) }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
-const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage Chanceux' }
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux' }
 
 function showPage(focus = false) {
   const requested = location.hash.slice(1)
@@ -206,6 +298,8 @@ function showPage(focus = false) {
   $('lucky').hidden = page !== 'chanceux'
   if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
   $('page-title').textContent = pages[page]
+  document.querySelector('.page-heading').classList.toggle('lucky-heading', page === 'chanceux')
+  $('tournament-summary').hidden = page === 'chanceux'
   document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page')
@@ -514,8 +608,8 @@ async function moveDrawPlayers(moves, reduced, duration) {
   rectangles.forEach(({ token, destination }) => { token.classList.remove('moving'); destination.append(token) })
 }
 
-function drawTone(frequency, duration = 0.05, delay = 0) {
-  if (!drawAudio || drawAudio.state !== 'running' || !drawSound) return
+function drawTone(frequency, duration = 0.05, delay = 0, enabled = drawSound) {
+  if (!drawAudio || drawAudio.state !== 'running' || !enabled) return
   const oscillator = drawAudio.createOscillator(), volume = drawAudio.createGain()
   const start = drawAudio.currentTime + delay
   oscillator.type = 'sine'; oscillator.frequency.value = frequency
@@ -528,6 +622,7 @@ function drawTone(frequency, duration = 0.05, delay = 0) {
 }
 
 function renderSoundToggle() {
+  $('draw-sound-label').textContent = drawSound ? 'Son actif' : 'Son coupé'
   const button = $('draw-sound')
   button.setAttribute('aria-pressed', String(drawSound))
   button.setAttribute('aria-label', drawSound ? 'Couper le son du tirage' : 'Activer le son du tirage')
@@ -551,7 +646,8 @@ $('draw').addEventListener('click', async () => {
   controls.forEach(control => { control.disabled = true })
   $('draw-result').hidden = false
   $('draw-status').textContent = 'Tirage en cours…'
-  $('draw').textContent = 'Tirage en cours…'
+  $('draw-label').textContent = 'En cours…'
+  $('draw').setAttribute('aria-label', 'Tirage en cours')
   try {
     if (drawSound) {
       try {
@@ -596,7 +692,8 @@ $('draw').addEventListener('click', async () => {
     drawing = false
     controls.forEach((control, index) => { control.disabled = previous[index] })
     $('draw-result').hidden = false
-    $('draw').textContent = 'Tirer au sort'
+    $('draw-label').textContent = 'Tirer au sort'
+    $('draw').setAttribute('aria-label', 'Tirer au sort')
   }
 })
 $('reset-draw').addEventListener('click', () => { drawSeed = null; manualDrawOrder = null; showDrawResult = false; recalculate() })
@@ -629,6 +726,10 @@ try {
     luckyCount = plan.count
     luckyRemoved = new Set(Array.isArray(saved.luckyRemoved) ? saved.luckyRemoved.filter(id => Number.isInteger(id) && id >= 1 && id <= plan.count) : [])
     luckyStarted = saved.luckyStarted === true
+    luckyTarget = Number.isInteger(saved.luckyTarget) && saved.luckyTarget >= 1 && saved.luckyTarget <= plan.count ? saved.luckyTarget : 1
+    luckyBudget = Number.isFinite(saved.luckyBudget) ? Math.max(0, Math.min(13700, saved.luckyBudget)) : 13700
+    luckySound = saved.luckySound !== false
+    renderLuckySound()
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
     view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))
     selectedPlayer = Number.isInteger(saved.selectedPlayer) && saved.selectedPlayer >= 0 && saved.selectedPlayer <= plan.count ? saved.selectedPlayer : 0
