@@ -1,7 +1,7 @@
-const VERSION = 'v66'
+const VERSION = 'v67'
 const PREFIX = `rotations-tarot:${self.registration.scope}:`
 const CACHE = PREFIX + VERSION
-const FILES = ['./', './index.html', './style.css', './app.js', './engine.js', './app.js?v=66', './engine.js?v=66', './optimizer.js', './movements.js', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './manifest.webmanifest']
+const FILES = ['./', './index.html', './style.css', './app.js', './engine.js', './app.js?v=67', './engine.js?v=67', './optimizer.js', './movements.js', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './manifest.webmanifest']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(file => new Request(new URL(file, self.registration.scope), { cache: 'reload' })))).then(() => self.skipWaiting()))
