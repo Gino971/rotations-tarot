@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=77'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=77'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=79'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=79'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -489,7 +489,7 @@ function exchangeChips(firstId, secondId) {
 }
 
 function startChipDrag(event) {
-  const chip = event.target.closest('.draw-player')
+  const chip = event.target.closest('.draw-player') || event.target.closest('[data-slot]')?.querySelector('.draw-player')
   if (drawing || chipDrag || !chip || !chip.parentElement.hasAttribute('data-slot') || event.button !== 0) return
   event.preventDefault()
   chipDrag = { container: event.currentTarget, chip, id: Number(chip.dataset.player), pointer: event.pointerId, x: event.clientX, y: event.clientY, ghost: null, target: null }
@@ -833,9 +833,39 @@ $('timer-start').addEventListener('click', () => {
   else { if (countdown.remaining === 0) countdown.remaining = countdown.duration; countdown.deadline = Date.now() + countdown.remaining; countdown.finished = false }
   saveTimer(); tickTimer()
 })
-for (const [id, step] of [['timer-minus', -1], ['timer-plus', 1]]) $(id).addEventListener('click', () => {
-  stopTimerAlarm(); adjustTimer(countdown, step); countdown.finished = false; saveTimer(); tickTimer()
-})
+let timerHold = null
+function stopTimerHold() {
+  if (!timerHold) return
+  clearTimeout(timerHold.timeout)
+  const { button, pointer } = timerHold
+  timerHold = null
+  if (button.hasPointerCapture(pointer)) button.releasePointerCapture(pointer)
+}
+for (const [id, step] of [['timer-minus', -1], ['timer-plus', 1]]) {
+  const button = $(id)
+  const change = () => { stopTimerAlarm(); adjustTimer(countdown, step); countdown.finished = false; saveTimer(); tickTimer() }
+  button.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0) return
+    event.preventDefault()
+    stopTimerHold()
+    button.setPointerCapture(event.pointerId)
+    timerHold = { button, pointer: event.pointerId, timeout: null, repeats: 0 }
+    change()
+    const repeat = () => {
+      if (!timerHold || timerHold.button !== button) return
+      change(); timerHold.repeats++
+      timerHold.timeout = setTimeout(repeat, timerHold.repeats > 8 ? 80 : 150)
+    }
+    timerHold.timeout = setTimeout(repeat, 450)
+  })
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) button.addEventListener(type, stopTimerHold)
+  // Pointer presses are handled above; keyboard and assistive clicks remain supported.
+  button.addEventListener('click', event => { if (event.detail === 0) change() })
+  button.addEventListener('contextmenu', event => event.preventDefault())
+}
+window.addEventListener('blur', stopTimerHold)
+window.addEventListener('hashchange', stopTimerHold)
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopTimerHold() })
 $('timer-reset').addEventListener('click', () => {
   stopTimerAlarm(); countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
 })
