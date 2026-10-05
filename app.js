@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=82'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=82'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=97'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=97'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -210,6 +210,8 @@ function updateOptions() {
   const count = Number($('count').value)
   const options = optionsFor(count)
   if (!options.some(option => option.value === mode && !option.disabled)) mode = options.find(option => !option.disabled)?.value || ''
+  const excludedField = $('excluded-field')
+  excludedField.remove()
   $('modes').replaceChildren()
   for (const option of options) {
     const label = document.createElement('label')
@@ -219,9 +221,15 @@ function updateOptions() {
     input.checked = mode === option.value; input.disabled = !!option.disabled
     const text = document.createElement('span')
     const title = document.createElement('strong'); title.textContent = option.label
-    text.append(title); label.append(input, text); $('modes').append(label)
+    text.append(title); label.append(input, text)
+    if (option.value === 'excluded') {
+      const row = document.createElement('div'); row.className = 'mode-option excluded-option'
+      label.className = 'excluded-option-choice'
+      row.append(label, excludedField); $('modes').append(row)
+    } else $('modes').append(label)
     input.addEventListener('change', () => { mode = input.value; updateOptions(); recalculate() })
   }
+  if (!excludedField.isConnected) $('modes').append(excludedField)
   $('mode-field').hidden = options.length === 1
   $('excluded-field').hidden = mode !== 'excluded'
   const old = Number($('rounds').value) || 4
@@ -269,7 +277,7 @@ function renderExclusionSelectors() {
   for (let index = 0; index < 1; index++) {
     if (manualExclusions[index] > count) manualExclusions[index] = null
     const label = document.createElement('label')
-    label.textContent = `Manche ${index + 1}`
+    label.className = 'inline-excluded-label'
     const select = document.createElement('select')
     select.setAttribute('aria-label', `Exclu de la manche ${index + 1}`)
     select.add(new Option('—', ''))
@@ -299,6 +307,12 @@ function showPage(focus = false) {
   $('lucky').hidden = page !== 'chanceux'
   $('timer-panel').hidden = page !== 'minuteur'
   if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
+  const heading = document.querySelector('.page-heading')
+  const controls = document.querySelector('.result-controls')
+  heading.classList.toggle('placements-heading', page === 'placements')
+  heading.classList.toggle('settings-heading', page === 'reglages')
+  if (page === 'placements') heading.append(controls)
+  else $('results').prepend(controls)
   $('page-title').textContent = pages[page]
   document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur'].includes(page))
   $('tournament-summary').hidden = ['chanceux', 'minuteur'].includes(page)
@@ -580,6 +594,7 @@ function buildDrawTables(tables, container) {
       const label = document.createElement('small'); label.textContent = seats[index]
       const token = document.createElement('strong'); token.className = 'draw-player'
       token.textContent = player.id === null ? 'Mort' : `J${player.id}`
+      if (player.id === null) token.classList.add('table-mort')
       if (player.id !== null && round === 0) {
         seat.dataset.slot = `${table.table}:${index}`; token.dataset.player = player.id
         token.tabIndex = 0; token.setAttribute('role', 'button'); token.setAttribute('aria-label', `Joueur ${player.id}`)
@@ -724,7 +739,8 @@ updateOptions()
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey))
   if (saved) {
-    const savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
+    let savedMode = ['morts2', 'morts3'].includes(saved.mode) ? 'morts' : saved.mode
+    if (!optionsFor(saved.count).some(option => option.value === savedMode && !option.disabled)) savedMode = optionsFor(saved.count).find(option => !option.disabled)?.value
     manualExclusions = normalizeExclusions(saved.count, Array.isArray(saved.exclusions) ? saved.exclusions : [], saved.rounds)
     drawSound = saved.drawSound !== false
     renderSoundToggle()

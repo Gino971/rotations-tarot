@@ -45,7 +45,7 @@ test('new mixed plans substantially reduce the old cyclic repeated encounters', 
 })
 
 test('adding a round preserves existing placements and recalculation is deterministic', () => {
-  for (const [count, mode] of [[9, 'morts'], [21, 'morts'], [11, 'mixed'], [29, 'mixed']]) {
+  for (const [count, mode] of [[9, 'morts'], [21, 'morts'], [15, 'mixed'], [29, 'mixed']]) {
     const shorter = createPlan(count, 3, mode)
     const longer = createPlan(count, 4, mode)
     for (const name of Object.keys(shorter.rotations)) assert.deepEqual(shorter.rotations[name], longer.rotations[name])
@@ -54,8 +54,8 @@ test('adding a round preserves existing placements and recalculation is determin
 })
 
 test('encounter lists count all shared tables, omit morts and preserve symmetry', () => {
-  const single = encountersFor(createPlan(6, 4, 'mixed'))
-  assert.deepEqual(single[0], [2, 3, 4, 5, 6].map(id => ({ id, times: 4 })))
+  const single = encountersFor(createPlan(5, 4, 'mixed'))
+  assert.deepEqual(single[0], [2, 3, 4, 5].map(id => ({ id, times: 4 })))
   for (const mode of ['mixed', 'morts']) {
     const plan = createPlan(9, 4, mode)
     const rows = encountersFor(plan)
@@ -140,13 +140,13 @@ test('draw display preserves fixed morts at North and the excluded player', () =
 })
 
 test('draw groups match actual table sizes, including five and six players', () => {
-  for (const count of [5, 6, 7, 9, 11, 13, 15, 21]) {
+  for (const count of [5, 7, 9, 10, 13, 15, 21]) {
     const sizes = drawGroupSizesFor(count, 'mixed')
     assert.deepEqual(sizes, createPlan(count, 1, 'mixed').rotations['Manche 1'].map(t => t.joueurs.length))
     assert.equal(sizes.reduce((sum, size) => sum + size, 0), count)
   }
   assert.deepEqual(drawGroupSizesFor(9, 'mixed'), [4, 5])
-  assert.deepEqual(drawGroupSizesFor(11, 'mixed'), [5, 6])
+  assert.throws(() => drawGroupSizesFor(11, 'mixed'))
   assert.deepEqual(drawGroupSizesFor(13, 'excluded', [7]), [4, 4, 4, 1])
 })
 

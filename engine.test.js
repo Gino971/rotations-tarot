@@ -34,9 +34,9 @@ test('standard rotations preserve the original movement engine', () => {
 })
 
 test('mixed table exceptions and source movement limits', () => {
-  assert.deepEqual(createPlan(6, 4, 'mixed').rotations['Manche 1'].map(table => table.joueurs.length), [6])
+  assert.throws(() => createPlan(6, 4, 'mixed'))
   assert.deepEqual(createPlan(7, 4, 'mixed').rotations['Manche 1'].map(table => table.joueurs.length), [3, 4])
-  assert.deepEqual(createPlan(11, 4, 'mixed').rotations['Manche 1'].map(table => table.joueurs.length), [5, 6])
+  assert.throws(() => createPlan(11, 4, 'mixed'))
   assert.equal(maxRounds(24, 'normal'), 5)
   assert.equal(maxRounds(32, 'normal'), 6)
   assert.throws(() => createPlan(24, 6, 'normal'))
@@ -70,7 +70,7 @@ test('movement explanations describe source rules, exceptions and real limits', 
     assert.equal(howell.limit, limit)
   }
   for (const count of [4, 8]) assert.equal(movementDetails(count, 'normal').label, 'Mouvement Club')
-  for (const count of [6, 7, 11, 21, 29]) {
+  for (const count of [7, 10, 15, 21, 29]) {
     const club = movementDetails(count, 'mixed')
     assert.equal(club.label, 'Rotations équilibrées')
     assert.match(club.description, /rencontres répétées/)
@@ -85,8 +85,7 @@ test('movement explanations describe source rules, exceptions and real limits', 
     const manual = movementDetails(count, 'excluded')
     assert.equal(manual.tables, (count - 1) / 4)
     assert.equal(manual.limit, limit)
-    assert.match(manual.description, /l’exclu n’a pas de place/)
-    assert.deepEqual(manual.exceptions, [])
+    assert.deepEqual(manual, movementDetails(count - 1, 'normal'))
   }
 })
 
@@ -131,4 +130,16 @@ test('a player may be excluded only once and conflicting later choices are clear
   assert.deepEqual(normalizeExclusions(9, [6, 2, 6, 2], 4), [6, 2, null, null])
   assert.deepEqual(normalizeExclusions(9, [6, null, 3, 8], 4), [6, null, 3, 8])
   assert.deepEqual(normalizeExclusions(9, [6, 3, 3, 8], 4), [6, 3, null, 8])
+})
+
+ test('mixed options state exact table counts and never seat six players', () => {
+  for (let count = 5; count <= 100; count++) {
+    const option = optionsFor(count).find(o => o.value === 'mixed')
+    if ([6,11].includes(count)) { assert.equal(option, undefined); continue }
+    if (!option) continue
+    const plan = createPlan(count, 1, 'mixed')
+    const tables = plan.rotations['Manche 1']
+    assert.ok(tables.every(t => t.joueurs.length <= 5))
+    if (count !== 7) assert.match(option.label, new RegExp(`^${tables.filter(t=>t.joueurs.length===5).length} tables? de 5`))
+  }
 })

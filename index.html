@@ -31,13 +31,13 @@
       <form id="setup-form">
         <div class="field-grid"><label>Nombre de joueurs<select id="count"></select></label><label>Nombre de manches<select id="rounds"></select></label></div>
         <fieldset id="mode-field"><legend>Répartition</legend><div id="modes"></div></fieldset>
-        <fieldset id="excluded-field" hidden><legend>Exclu de la première manche</legend><div id="exclusion-selectors" class="exclusion-grid"></div></fieldset>
+        <div id="excluded-field" hidden><div id="exclusion-selectors" class="exclusion-grid"></div></div>
+        <div id="movement-info" class="movement-info" role="status"></div>
         <fieldset class="draw-field"><legend>Première manche</legend>
           <div class="draw-actions"><button id="draw" type="button" class="primary action-icon" aria-label="Tirer au sort" title="Tirer au sort"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 4 12 8-12 8Z" fill="currentColor" stroke="none"/></svg><span class="action-label" id="draw-label">Tirer au sort</span></button><button id="draw-sound" type="button" class="sound-toggle secondary" aria-pressed="true" aria-label="Couper le son du tirage" title="Couper le son"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6.5 6.8 9.5H4.5v5h2.3l3.7 3V6.5Z"/><g class="sound-waves"><path d="M14 9a4.3 4.3 0 0 1 0 6M17 6.5a7.8 7.8 0 0 1 0 11"/></g><path class="sound-slash" d="m14 9 6 6m0-6-6 6"/></svg><span class="action-label" id="draw-sound-label">Son actif</span></button><button id="reset-draw" type="button" class="secondary action-icon" aria-label="Réinitialiser" title="Réinitialiser"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span class="action-label">Réinitialiser</span></button></div>
           <div id="draw-result" class="draw-result" hidden><div id="draw-order" class="chip-grid"></div></div>
           <p id="draw-status" class="hint" hidden role="status"></p>
         </fieldset>
-        <div id="movement-info" class="movement-info" role="status"></div>
         <div class="placement-action"><button type="submit" class="primary action-icon" aria-label="Voir les placements" title="Voir les placements"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="action-label">Placements</span></button></div>
         <p id="offline-status" class="hint" role="status">Préparation du mode hors ligne…</p>
         <p id="error" class="error" role="alert"></p>
@@ -46,7 +46,7 @@
     <section id="results" hidden aria-label="Placements">
       <div class="result-controls">
         <div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active action-icon" aria-label="Par joueur" title="Par joueur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><span class="action-label">Par joueur</span></button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view" class="action-icon" aria-label="Par table" title="Par table"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="action-label">Par table</span></button></div>
-        <div class="placement-navigation"><button id="previous" class="secondary action-icon" aria-label="Joueur précédent"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg><span class="action-label">Précédent</span></button><select id="current-placement" aria-label="Joueur"></select><button id="next" class="secondary action-icon" aria-label="Joueur suivant"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg><span class="action-label">Suivant</span></button></div>
+        <div class="placement-navigation"><button id="previous" class="secondary action-icon" aria-label="Joueur précédent"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><select id="current-placement" aria-label="Joueur"></select><button id="next" class="secondary action-icon" aria-label="Joueur suivant"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button></div>
       </div>
       <div id="player-view" role="tabpanel" aria-labelledby="by-player">
         <div id="player-cards" class="player-grid"></div>
@@ -81,6 +81,6 @@
       <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
     </form>
   </dialog>
-  <script type="module" src="app.js?v=82"></script>
+  <script type="module" src="app.js?v=97"></script>
 </body>
 </html>

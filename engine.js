@@ -8,10 +8,12 @@ export function optionsFor(count) {
   if (count % 4 === 0) return [{ value: 'normal', label: 'Tables de 4', detail: `${count / 4} tables complètes.` }]
   const missing = 4 - count % 4
   const canPlaceMorts = Math.ceil(count / 4) >= missing
+  const fiveTables = count % 4
+  const fourTables = (count - fiveTables * 5) / 4
   return [
     { value: 'morts', label: `Ajouter ${missing} mort${missing > 1 ? 's' : ''}`, detail: `${Math.ceil(count / 4)} tables de 4, avec ${missing} place${missing > 1 ? 's' : ''} vide${missing > 1 ? 's' : ''} au Nord.`, disabled: !canPlaceMorts },
-    { value: 'mixed', label: 'Tables de 5 ou 6 joueurs', detail: count === 6 ? 'Une table de 6, avec deux places exemptes.' : count === 7 ? 'Une table de 3 et une table de 4, comme dans l’application de tournoi.' : count === 11 ? 'Une table de 5 et une table de 6.' : 'Tables de 4 et 5 ; places supplémentaires exemptes.' },
-    ...(count % 4 === 1 ? [{ value: 'excluded', label: 'Un joueur exclu par manche', detail: 'Choisissez l’exclu de la première manche. Toutes les rotations sont préparées avec les autres joueurs.' }] : [])
+    ...([6, 11].includes(count) ? [] : [{ value: 'mixed', label: count === 7 ? '1 table de 3 et 1 table de 4' : `${fiveTables} table${fiveTables > 1 ? 's' : ''} de 5${fourTables > 0 ? ` et ${fourTables} table${fourTables > 1 ? 's' : ''} de 4` : ''}`, detail: 'Répartition sans table de 6.' }]),
+    ...(count % 4 === 1 ? [{ value: 'excluded', label: 'Exclus 1ere manche', detail: 'Choisissez l’exclu de la première manche. Toutes les rotations sont préparées avec les autres joueurs.' }] : [])
   ]
 }
 
@@ -49,16 +51,12 @@ function describeMoves(text) {
 }
 
 export function movementDetails(count, mode) {
+  if (mode === 'excluded') return movementDetails(count - 1, 'normal')
   const limit = maxRounds(count, mode)
   // Read the actual first-round table layout, including 3/4 and 5/6
   // exceptions. Manual exclusions have a fixed count of active tables.
   const tables = mode === 'excluded' ? (count - 1) / 4 : createPlan(count, 1, mode).rotations['Manche 1'].length
   const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
-  if (mode === 'excluded') {
-    details.label = 'Mouvement spécial · exclu manuel'
-    details.description = 'Exclu à choisir pour la première manche ; l’exclu n’a pas de place dans le plan des rotations.'
-    return details
-  }
   if (mode === 'mixed' || mode === 'morts') {
     details.label = 'Rotations équilibrées'
     details.description = 'Passages équilibrés, rencontres répétées limitées. Voir les placements.'
