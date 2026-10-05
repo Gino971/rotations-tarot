@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=79'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=79'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=80'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=80'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -867,7 +867,7 @@ window.addEventListener('blur', stopTimerHold)
 window.addEventListener('hashchange', stopTimerHold)
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopTimerHold() })
 $('timer-reset').addEventListener('click', () => {
-  stopTimerAlarm(); countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
+  stopTimerHold(); stopTimerAlarm(); countdown.duration = 50 * 60000; countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
 })
 $('timer-stop-alarm').addEventListener('click', stopTimerAlarm)
 document.addEventListener('visibilitychange', tickTimer)
