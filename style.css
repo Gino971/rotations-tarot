@@ -103,3 +103,5 @@ button,a,select,[role="button"]{touch-action:manipulation}.timer-adjust button{u
 html{touch-action:manipulation}
 
 #timer-plus,#timer-minus,#timer-plus *,#timer-minus *{touch-action:none;user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none}#table-cards .seat[data-slot]{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}#table-cards .seat:has(.chip-selected),#table-cards .seat:has(.chip-drop-target){background:#e8cf91;border-color:#fff3c8;outline:3px solid #e8cf91;outline-offset:2px;box-shadow:0 0 14px #e8cf9140}#table-cards .seat:has(.chip-selected) small,#table-cards .seat:has(.chip-selected) strong,#table-cards .seat:has(.chip-drop-target) small,#table-cards .seat:has(.chip-drop-target) strong{color:var(--green)}#table-cards .chip-selected,#table-cards .chip-drop-target{outline:none}
+
+#setup #excluded-field{margin:20px 0 0;padding:14px 16px;background:#edf1e7;border-radius:12px}

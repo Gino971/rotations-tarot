@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=80'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=80'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=82'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=82'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -264,9 +264,9 @@ function renderExclusionSelectors() {
   if (mode !== 'excluded') return
   const count = Number($('count').value)
   const rounds = Number($('rounds').value)
-  manualExclusions = normalizeExclusions(count, manualExclusions, rounds)
+  manualExclusions = normalizeExclusions(count, manualExclusions.slice(0, 1), rounds)
   const used = new Set()
-  for (let index = 0; index < rounds; index++) {
+  for (let index = 0; index < 1; index++) {
     if (manualExclusions[index] > count) manualExclusions[index] = null
     const label = document.createElement('label')
     label.textContent = `Manche ${index + 1}`

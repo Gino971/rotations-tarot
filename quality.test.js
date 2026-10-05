@@ -118,9 +118,9 @@ test('draw keeps the same balanced schedule with randomly reassigned player numb
 
 test('draw respects manual exclusions using actual player numbers', () => {
   const plan = createPlan(13, 3, 'excluded', [2, null, 7], true, 999)
-  assert.deepEqual(plan.excluded, [2, null, 7])
-  assert.deepEqual(plan.rotations['Manche 2'], [])
-  for (const [name, excluded] of [['Manche 1', 2], ['Manche 3', 7]]) {
+  assert.deepEqual(plan.excluded, [2, 2, 2])
+  assert.equal(plan.rotations['Manche 2'].flatMap(t => t.joueurs).length, 12)
+  for (const [name, excluded] of [['Manche 1', 2], ['Manche 3', 2]]) {
     const ids = plan.rotations[name].flatMap(t => t.joueurs.map(p => p.id))
     assert.equal(ids.length, 12); assert.equal(new Set(ids).size, 12); assert.ok(!ids.includes(excluded))
   }

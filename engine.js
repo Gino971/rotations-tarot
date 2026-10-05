@@ -11,7 +11,7 @@ export function optionsFor(count) {
   return [
     { value: 'morts', label: `Ajouter ${missing} mort${missing > 1 ? 's' : ''}`, detail: `${Math.ceil(count / 4)} tables de 4, avec ${missing} place${missing > 1 ? 's' : ''} vide${missing > 1 ? 's' : ''} au Nord.`, disabled: !canPlaceMorts },
     { value: 'mixed', label: 'Tables de 5 ou 6 joueurs', detail: count === 6 ? 'Une table de 6, avec deux places exemptes.' : count === 7 ? 'Une table de 3 et une table de 4, comme dans l’application de tournoi.' : count === 11 ? 'Une table de 5 et une table de 6.' : 'Tables de 4 et 5 ; places supplémentaires exemptes.' },
-    ...(count % 4 === 1 ? [{ value: 'excluded', label: 'Un joueur exclu par manche', detail: 'Choisissez vous-même l’exclu de chaque manche selon les résultats. Aucune place ne lui est attribuée.' }] : [])
+    ...(count % 4 === 1 ? [{ value: 'excluded', label: 'Un joueur exclu par manche', detail: 'Choisissez l’exclu de la première manche. Toutes les rotations sont préparées avec les autres joueurs.' }] : [])
   ]
 }
 
@@ -56,7 +56,7 @@ export function movementDetails(count, mode) {
   const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
   if (mode === 'excluded') {
     details.label = 'Mouvement spécial · exclu manuel'
-    details.description = 'Exclu à choisir par manche ; l’exclu n’a pas de place.'
+    details.description = 'Exclu à choisir pour la première manche ; l’exclu n’a pas de place dans le plan des rotations.'
     return details
   }
   if (mode === 'mixed' || mode === 'morts') {
@@ -112,23 +112,11 @@ export function createPlan(count, rounds, mode, exclusions = [], optimized = tru
   let rotations
   const excluded = []
   if (mode === 'excluded') {
-    rotations = {}
-    const alreadyExcluded = new Set()
-    for (let r = 0; r < rounds; r++) {
-      const id = exclusions[r] ?? null
-      if (id !== null && (!Number.isInteger(id) || id < 1 || id > count)) throw new Error(`Choisissez un joueur de 1 à ${count} pour la manche ${r + 1}.`)
-      if (id !== null && alreadyExcluded.has(id)) throw new Error(`Le joueur ${id} a déjà été exclu.`)
-      if (id !== null) alreadyExcluded.add(id)
-      excluded.push(id)
-      if (id === null) {
-        rotations[`Manche ${r + 1}`] = []
-        continue
-      }
-      // Keep every remaining player in numerical order. The table array is
-      // read as Nord, Sud, Est, Ouest by both the engine and the interface.
-      const active = base.filter(player => player.id !== id)
-      rotations[`Manche ${r + 1}`] = calculRotationsRainbow(active, r + 1)[`Manche ${r + 1}`]
-    }
+    const id = exclusions[0] ?? null
+    if (id !== null && (!Number.isInteger(id) || id < 1 || id > count)) throw new Error(`Choisissez un joueur de 1 à ${count} pour la première manche.`)
+    excluded.push(...Array(rounds).fill(id))
+    const active = base.filter(player => player.id !== id)
+    rotations = id === null ? Object.fromEntries(Array.from({ length: rounds }, (_, r) => [`Manche ${r + 1}`, []])) : calculRotationsRainbow(active, rounds)
   } else if (mode === 'mixed' && count === 6) {
     // The original small-count fallback made a table of 2. Keep all six
     // at one table using its Club shift, with the two extra seats exempt.
