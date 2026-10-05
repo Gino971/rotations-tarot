@@ -1,4 +1,5 @@
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=67'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=77'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=77'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -286,7 +287,7 @@ function persist() {
   } catch { /* Device storage may be unavailable. */ }
 }
 
-const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux' }
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux', minuteur: 'Minuteur' }
 
 function showPage(focus = false) {
   const requested = location.hash.slice(1)
@@ -296,10 +297,11 @@ function showPage(focus = false) {
   $('results').hidden = page !== 'placements'
   $('encounters').hidden = page !== 'rencontres'
   $('lucky').hidden = page !== 'chanceux'
+  $('timer-panel').hidden = page !== 'minuteur'
   if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
   $('page-title').textContent = pages[page]
-  document.querySelector('.page-heading').classList.toggle('lucky-heading', page === 'chanceux')
-  $('tournament-summary').hidden = page === 'chanceux'
+  document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur'].includes(page))
+  $('tournament-summary').hidden = ['chanceux', 'minuteur'].includes(page)
   document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page')
@@ -385,7 +387,7 @@ function renderPlayers() {
   for (let id = 1; id <= plan.count; id++) {
     if (selectedPlayer && selectedPlayer !== id) continue
     const card = document.createElement('article'); card.className = 'player-card'
-    card.innerHTML = `<h3 class="player-card-header">Joueur ${id}</h3><div class="itinerary">${positionsFor(plan, id).map((position, index) => `<div class="position-row"><span>Manche ${index + 1}</span>${position.pending ? '<span>À définir</span>' : position.excluded ? '<span class="excluded-label">Exclu</span>' : `<span class="destination">Table ${position.table}<span class="seat-badge">${position.seat}</span></span>`}</div>`).join('')}</div>`
+    card.innerHTML = `<h3 class="player-card-header"><span>Joueur</span><span class="player-number">${id}</span></h3><div class="itinerary">${positionsFor(plan, id).map((position, index) => `<div class="position-row"><span class="round-label">Manche <span class="round-number">${index + 1}</span></span>${position.pending ? '<span>À définir</span>' : position.excluded ? '<span class="excluded-label">Exclu</span>' : `<span class="destination">Table ${position.table} ${{ Nord: 'N', Sud: 'S', Est: 'E', Ouest: 'O' }[position.seat] || position.seat}</span>`}</div>`).join('')}</div>`
     $('player-cards').append(card)
   }
   if (!$('player-cards').children.length) {
@@ -586,9 +588,16 @@ function buildDrawTables(tables, container) {
       seat.append(label, token); (index < 4 ? layout : extras).append(seat)
     }
     const center = document.createElement('span'); center.className = 'table-center'; center.setAttribute('aria-hidden', 'true')
-    const spade = document.createElement('span'); spade.className = 'table-spade'; spade.textContent = '♠'
-    const number = document.createElement('span'); number.className = 'table-number'; number.textContent = table.table
-    center.append(spade, number); layout.append(center)
+    const spade = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    spade.classList.add('table-spade'); spade.setAttribute('viewBox', '0 0 32 32')
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    shape.setAttribute('d', 'M16 2C13 7 3 12 3 18C3 26 12 27 16 21C20 27 29 26 29 18C29 12 19 7 16 2ZM16 19 11 30H21Z')
+    shape.setAttribute('fill', 'currentColor')
+    const number = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+    number.classList.add('table-number'); number.setAttribute('x', '16'); number.setAttribute('y', '17')
+    number.setAttribute('text-anchor', 'middle'); number.setAttribute('dominant-baseline', 'central')
+    number.textContent = table.table
+    spade.append(shape, number); center.append(spade); layout.append(center)
     card.append(layout)
     if (extras.children.length) card.append(extras)
     container.append(card)
@@ -752,3 +761,86 @@ if ('serviceWorker' in navigator) {
     })
     .catch(() => { $('offline-status').textContent = 'Ouvrir une fois avec Internet pour préparer le mode hors ligne.' })
 }
+
+
+const timerStorageKey = 'rotations-timer-v1'
+let countdown = { duration: 50 * 60000, remaining: 50 * 60000, deadline: null, finished: false }
+let timerAudio = null
+let alarmNodes = []
+let alarmTimeout = null
+try {
+  const saved = JSON.parse(localStorage.getItem(timerStorageKey))
+  if (saved && Number.isFinite(saved.duration) && saved.duration >= 60000 && saved.duration <= 180 * 60000 && Number.isFinite(saved.remaining) && saved.remaining >= 0 && saved.remaining <= 180 * 60000 && (saved.deadline === null || Number.isFinite(saved.deadline))) countdown = { ...saved, finished: saved.finished === true }
+} catch { /* Device storage may be unavailable. */ }
+function saveTimer() {
+  try { localStorage.setItem(timerStorageKey, JSON.stringify(countdown)) } catch { /* Local storage is optional. */ }
+}
+function prepareTimerAudio() {
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext
+    if (Audio) { timerAudio ||= new Audio(); timerAudio.resume().catch(() => {}) }
+  } catch { /* Visual alarm remains available. */ }
+}
+function stopTimerAlarm() {
+  clearTimeout(alarmTimeout)
+  for (const node of alarmNodes) { try { node.stop() } catch {} }
+  alarmNodes = []
+  $('timer-stop-alarm').hidden = true
+}
+function ringTimer() {
+  stopTimerAlarm()
+  if (!timerAudio || timerAudio.state !== 'running') return
+  $('timer-stop-alarm').hidden = false
+  // Repeated metallic strikes with inharmonic overtones, like a mechanical bell.
+  for (let strike = 0; strike < 20; strike++) for (const [ratio, amplitude] of [[1, .1], [2.76, .045], [5.4, .018]]) {
+    const oscillator = timerAudio.createOscillator(), gain = timerAudio.createGain()
+    const start = timerAudio.currentTime + strike * .23
+    oscillator.frequency.value = 820 * ratio
+    gain.gain.setValueAtTime(0, start)
+    gain.gain.linearRampToValueAtTime(amplitude, start + .004)
+    gain.gain.exponentialRampToValueAtTime(.0001, start + .7)
+    oscillator.connect(gain); gain.connect(timerAudio.destination)
+    oscillator.start(start); oscillator.stop(start + .75)
+    alarmNodes.push(oscillator)
+    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect() }
+  }
+  alarmTimeout = setTimeout(stopTimerAlarm, 5500)
+}
+function renderTimer() {
+  const text = timerText(timerRemaining(countdown))
+  $('timer-display').textContent = text
+  $('menu-timer').textContent = text
+  $('menu-timer').setAttribute('aria-label', `Minuteur : ${text} restantes`)
+  $('menu-timer').classList.toggle('timer-running', countdown.deadline !== null)
+  $('menu-timer').classList.toggle('timer-finished', countdown.finished)
+  $('timer-panel').classList.toggle('timer-finished', countdown.finished)
+  const running = countdown.deadline !== null
+  $('timer-start').classList.toggle('is-playing', running)
+  $('timer-start').setAttribute('aria-label', running ? 'Mettre le minuteur en pause' : 'Lancer le minuteur')
+  $('timer-start-label').textContent = running ? 'Pause' : 'Lancer'
+  $('timer-status').textContent = countdown.finished ? 'Temps écoulé !' : ''
+}
+function tickTimer() {
+  if (countdown.deadline !== null && timerRemaining(countdown) === 0) {
+    countdown.deadline = null; countdown.remaining = 0; countdown.finished = true
+    saveTimer(); ringTimer()
+  }
+  renderTimer()
+}
+$('timer-start').addEventListener('click', () => {
+  stopTimerAlarm(); prepareTimerAudio()
+  if (countdown.deadline !== null) { countdown.remaining = timerRemaining(countdown); countdown.deadline = null }
+  else { if (countdown.remaining === 0) countdown.remaining = countdown.duration; countdown.deadline = Date.now() + countdown.remaining; countdown.finished = false }
+  saveTimer(); tickTimer()
+})
+for (const [id, step] of [['timer-minus', -1], ['timer-plus', 1]]) $(id).addEventListener('click', () => {
+  stopTimerAlarm(); adjustTimer(countdown, step); countdown.finished = false; saveTimer(); tickTimer()
+})
+$('timer-reset').addEventListener('click', () => {
+  stopTimerAlarm(); countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
+})
+$('timer-stop-alarm').addEventListener('click', stopTimerAlarm)
+document.addEventListener('visibilitychange', tickTimer)
+window.addEventListener('pageshow', tickTimer)
+setInterval(tickTimer, 250)
+tickTimer()

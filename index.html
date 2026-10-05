@@ -15,13 +15,15 @@
   <title>Rotations tarot</title>
 </head>
 <body>
-  <header class="topbar"><h1><a href="#reglages"><span class="brand-icon" aria-hidden="true">♠</span> Rotations tarot</a></h1>
+  <header class="topbar"><h1><a href="#reglages"><span class="brand-icon" aria-hidden="true">♠</span> Rotations</a></h1>
     <nav class="page-navigation" aria-label="Navigation principale">
       <a href="#reglages" data-page="reglages" aria-label="Réglages" data-tooltip="Réglages"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></a>
       <a href="#placements" data-page="placements" aria-label="Placements" data-tooltip="Placements"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a>
       <a href="#rencontres" data-page="rencontres" aria-label="Rencontres" data-tooltip="Rencontres"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/></svg></a>
       <a href="#chanceux" data-page="chanceux" aria-label="Tirage Chanceux" data-tooltip="Tirage Chanceux"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/></svg></a>
+      <a href="#minuteur" data-page="minuteur" aria-label="Minuteur" data-tooltip="Minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="14" r="8"/><path d="M9 2h6M12 2v4m6 1 2-2M12 10v4l3 2"/></svg></a>
     </nav>
+    <a href="#minuteur" id="menu-timer" class="menu-timer" aria-label="Temps restant du minuteur">50:00</a>
   </header>
   <main>
     <div class="page-heading"><h2 id="page-title" tabindex="-1">Réglages</h2><p id="tournament-summary"></p></div>
@@ -42,7 +44,7 @@
     </section>
     <section id="results" hidden aria-label="Placements">
       <div class="result-controls">
-        <div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active action-icon" aria-label="Par joueur" title="Par joueur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><span class="action-label">Par joueur</span></button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view" class="action-icon" aria-label="Par manche" title="Par manche"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="action-label">Par manche</span></button></div>
+        <div class="tabs" role="tablist" aria-label="Vue du plan"><button id="by-player" role="tab" aria-selected="true" aria-controls="player-view" class="active action-icon" aria-label="Par joueur" title="Par joueur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><span class="action-label">Par joueur</span></button><button id="by-round" role="tab" aria-selected="false" aria-controls="round-view" class="action-icon" aria-label="Par table" title="Par table"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="action-label">Par table</span></button></div>
         <div class="placement-navigation"><button id="previous" class="secondary action-icon" aria-label="Joueur précédent"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg><span class="action-label">Précédent</span></button><select id="current-placement" aria-label="Joueur"></select><button id="next" class="secondary action-icon" aria-label="Joueur suivant"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg><span class="action-label">Suivant</span></button></div>
       </div>
       <fieldset id="excluded-field" hidden><legend>Choisir les Exclus</legend><div id="exclusion-selectors" class="exclusion-grid"></div></fieldset>
@@ -62,6 +64,15 @@
       <div id="lucky-winner" class="lucky-winner" hidden><h3 id="lucky-winner-title"></h3><div id="lucky-winner-chip"></div></div>
       <div id="lucky-chips" class="lucky-chips" aria-label="Jetons du tirage"></div>
     </section>
+    <section id="timer-panel" class="panel timer-panel" hidden aria-label="Minuteur">
+      <div class="timer-adjust"><button id="timer-minus" class="secondary" type="button" aria-label="Retirer une minute">−</button><div id="timer-display" class="timer-display" role="timer" aria-label="Temps restant">50:00</div><button id="timer-plus" class="secondary" type="button" aria-label="Ajouter une minute">+</button></div>
+      <div class="timer-actions">
+        <button id="timer-start" class="primary action-icon" type="button" aria-label="Lancer le minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path class="timer-play" d="m8 4 12 8-12 8Z"/><path class="timer-pause" d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg><span id="timer-start-label" class="action-label">Lancer</span></button>
+        <button id="timer-reset" class="secondary action-icon" type="button" aria-label="Réinitialiser le minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span class="action-label">Réinitialiser</span></button>
+        <button id="timer-stop-alarm" class="secondary" type="button" hidden>Arrêter la sonnerie</button>
+      </div>
+      <p id="timer-status" role="status" aria-live="polite"></p>
+    </section>
   </main>
   <dialog id="redraw-dialog" class="redraw-dialog" aria-labelledby="redraw-title" aria-describedby="redraw-description">
     <form method="dialog">
@@ -70,6 +81,6 @@
       <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
     </form>
   </dialog>
-  <script type="module" src="app.js?v=67"></script>
+  <script type="module" src="app.js?v=77"></script>
 </body>
 </html>
