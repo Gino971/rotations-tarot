@@ -21,6 +21,7 @@
       <a href="#placements" data-page="placements" aria-label="Placements" data-tooltip="Placements"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a>
       <a href="#rencontres" data-page="rencontres" aria-label="Rencontres" data-tooltip="Rencontres"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/></svg></a>
       <a href="#chanceux" data-page="chanceux" aria-label="Tirage Chanceux" data-tooltip="Tirage Chanceux"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/></svg></a>
+      <a href="#arbitrage" data-page="arbitrage" aria-label="Arbitrage" data-tooltip="Arbitrage"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v16M5 21h14M3 7l9-3 9 3M5 7l-3 7h6Zm14 0-3 7h6Z"/></svg></a>
     </nav>
     <a href="#minuteur" id="menu-timer" data-page="minuteur" class="menu-timer" aria-label="Temps restant du minuteur">50:00</a>
   </header>
@@ -73,6 +74,17 @@
       </div>
       <p id="timer-status" role="status" aria-live="polite"></p>
     </section>
+    <section id="arbitrage-panel" class="panel" hidden aria-label="Code d’arbitrage">
+      <p class="hint">Fédération Française de Tarot · Six fascicules intégrés · Consultation hors ligne</p>
+      <p id="library-manage" hidden><a href="library.html">⚙ Gérer la bibliothèque</a></p>
+      <div class="arbitrage-search-controls">
+        <div><label for="arbitrage-search">Rechercher dans les textes</label><input id="arbitrage-search" type="search" placeholder="Renonce, poignée, faux écart…" autocomplete="off"></div>
+        <div><label for="arbitrage-filter">Document</label><select id="arbitrage-filter"><option value="">Tous les documents</option></select></div>
+      </div>
+      <p id="arbitrage-count" class="hint" role="status" aria-live="polite">Chargement des textes…</p>
+      <div id="arbitrage-results" class="arbitrage-results"></div>
+      <section id="arbitrage-reader" hidden aria-label="Texte du document"><h3 id="arbitrage-reader-title"></h3><div class="arbitrage-page-controls"><button id="arbitrage-prev" class="secondary" aria-label="Page précédente">←</button><span id="arbitrage-page-number"></span><button id="arbitrage-next" class="secondary" aria-label="Page suivante">→</button></div><pre id="arbitrage-text" tabindex="0"></pre></section>
+    </section>
   </main>
   <dialog id="redraw-dialog" class="redraw-dialog" aria-labelledby="redraw-title" aria-describedby="redraw-description">
     <form method="dialog">
@@ -81,6 +93,6 @@
       <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
     </form>
   </dialog>
-  <script type="module" src="app.js?v=98"></script>
+  <script type="module" src="app.js?v=105"></script>
 </body>
 </html>

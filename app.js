@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=98'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=98'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=105'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=105'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -295,17 +295,19 @@ function persist() {
   } catch { /* Device storage may be unavailable. */ }
 }
 
-const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux', minuteur: 'Minuteur' }
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux', minuteur: 'Minuteur', arbitrage: 'Arbitrage' }
 
 function showPage(focus = false) {
   const requested = location.hash.slice(1)
   const page = Object.hasOwn(pages, requested) ? requested : 'reglages'
-  if (page !== 'reglages' && !plan) { location.hash = 'reglages'; return }
+  if (!['reglages', 'arbitrage', 'minuteur'].includes(page) && !plan) { location.hash = 'reglages'; return }
   $('setup').hidden = page !== 'reglages'
   $('results').hidden = page !== 'placements'
   $('encounters').hidden = page !== 'rencontres'
   $('lucky').hidden = page !== 'chanceux'
   $('timer-panel').hidden = page !== 'minuteur'
+  $('arbitrage-panel').hidden = page !== 'arbitrage'
+  if (page === 'arbitrage') queueMicrotask(loadArbitration)
   if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
   const heading = document.querySelector('.page-heading')
   const controls = document.querySelector('.result-controls')
@@ -314,8 +316,8 @@ function showPage(focus = false) {
   if (page === 'placements') heading.append(controls)
   else $('results').prepend(controls)
   $('page-title').textContent = pages[page]
-  document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur'].includes(page))
-  $('tournament-summary').hidden = ['chanceux', 'minuteur'].includes(page)
+  document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur', 'arbitrage'].includes(page))
+  $('tournament-summary').hidden = ['chanceux', 'minuteur', 'arbitrage'].includes(page)
   document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page')
@@ -901,3 +903,96 @@ document.addEventListener('visibilitychange', tickTimer)
 window.addEventListener('pageshow', tickTimer)
 setInterval(tickTimer, 250)
 tickTimer()
+
+let arbitrationDocuments = null
+let arbitrationLoading = null
+let arbitrationSelection = null
+const normalizeArbitration = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[’'-]/g, ' ')
+async function loadArbitration() {
+  if (arbitrationDocuments) return
+  if (arbitrationLoading) return arbitrationLoading
+  arbitrationLoading = (async () => {
+    try {
+      const localLibrary = ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
+      $('library-manage').hidden = !localLibrary
+      const response = await fetch(localLibrary ? '/api/library' : './arbitrage.json')
+      if (!response.ok) throw new Error('Documents indisponibles')
+      const data = await response.json()
+      arbitrationDocuments = Array.isArray(data) ? data : data.library
+      arbitrationDocuments.forEach((doc, index) => {
+        const option = document.createElement('option'); option.value = index; option.textContent = doc.title
+        $('arbitrage-filter').append(option)
+      })
+      renderArbitrationSearch()
+    } catch {
+      $('arbitrage-count').textContent = 'Impossible de charger les textes. Rechargez la page pour réessayer.'
+    } finally { arbitrationLoading = null }
+  })()
+  return arbitrationLoading
+}
+function arbitrationTerms() {
+  return normalizeArbitration($('arbitrage-search').value).trim().split(/\s+/).filter(Boolean)
+}
+function appendArbitrationText(target, text, terms) {
+  // Highlight matches with text nodes: source documents are never interpreted as HTML.
+  const normalized = normalizeArbitration(text)
+  const ranges = []
+  for (const term of terms) {
+    let from = 0, index
+    while ((index = normalized.indexOf(term, from)) !== -1) {
+      ranges.push([index, index + term.length]); from = index + term.length
+    }
+  }
+  ranges.sort((a,b) => a[0]-b[0])
+  let cursor = 0
+  for (const [start,end] of ranges) {
+    if (start < cursor) continue
+    target.append(document.createTextNode(text.slice(cursor,start)))
+    const mark = document.createElement('mark'); mark.textContent = text.slice(start,end); target.append(mark); cursor = end
+  }
+  target.append(document.createTextNode(text.slice(cursor)))
+}
+function showArbitrationPage(documentIndex, pageIndex) {
+  arbitrationSelection = {documentIndex, pageIndex}
+  const doc = arbitrationDocuments[documentIndex]
+  $('arbitrage-reader').hidden = false
+  $('arbitrage-reader-title').textContent = doc.title
+  $('arbitrage-page-number').textContent = `Page ${pageIndex+1} / ${doc.pages.length}`
+  $('arbitrage-prev').disabled = pageIndex === 0
+  $('arbitrage-next').disabled = pageIndex === doc.pages.length-1
+  $('arbitrage-text').replaceChildren()
+  appendArbitrationText($('arbitrage-text'), doc.pages[pageIndex], arbitrationTerms())
+}
+function renderArbitrationSearch() {
+  if (!arbitrationDocuments) return
+  const terms = arbitrationTerms(), filter = $('arbitrage-filter').value
+  $('arbitrage-results').replaceChildren()
+  $('arbitrage-reader').hidden = true
+  let count = 0
+  arbitrationDocuments.forEach((doc, documentIndex) => {
+    if (filter !== '' && Number(filter) !== documentIndex) return
+    doc.pages.forEach((text, pageIndex) => {
+      const normalized = normalizeArbitration(text)
+      if (terms.length && !terms.every(term => normalized.includes(term))) return
+      if (!terms.length && pageIndex !== 0) return
+      count++
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'arbitrage-result'
+      const title = document.createElement('strong'); title.textContent = `${doc.title} · p. ${pageIndex+1}`; button.append(title)
+      if (terms.length) {
+        const first = Math.min(...terms.map(term => normalized.indexOf(term)))
+        const start = Math.max(0,first-70), end = Math.min(text.length,first+200)
+        const snippet = document.createElement('span')
+        appendArbitrationText(snippet, `${start ? '…' : ''}${text.slice(start,end).replace(/\s/g,' ')}${end < text.length ? '…' : ''}`, terms)
+        button.append(snippet)
+      } else { const span = document.createElement('span'); span.textContent = `${doc.pages.length} pages · Lire le document`; button.append(span) }
+      button.addEventListener('click', () => { showArbitrationPage(documentIndex,pageIndex); $('arbitrage-reader').scrollIntoView({block:'start'}); $('arbitrage-text').focus({preventScroll:true}) })
+      $('arbitrage-results').append(button)
+    })
+  })
+  $('arbitrage-count').textContent = terms.length ? `${count} page${count>1?'s':''} trouvée${count>1?'s':''}` : `${count} documents disponibles`
+}
+$('arbitrage-search').addEventListener('input', renderArbitrationSearch)
+$('arbitrage-filter').addEventListener('change', renderArbitrationSearch)
+$('arbitrage-prev').addEventListener('click', () => { if(arbitrationSelection && arbitrationSelection.pageIndex>0) showArbitrationPage(arbitrationSelection.documentIndex,arbitrationSelection.pageIndex-1) })
+$('arbitrage-next').addEventListener('click', () => { if(arbitrationSelection && arbitrationSelection.pageIndex<arbitrationDocuments[arbitrationSelection.documentIndex].pages.length-1) showArbitrationPage(arbitrationSelection.documentIndex,arbitrationSelection.pageIndex+1) })
+if (location.hash === '#arbitrage') loadArbitration()

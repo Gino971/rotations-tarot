@@ -1,7 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
+import { generateArbitrationLibrary } from './documents.mjs'
 
-const files = ['index.html', 'style.css', 'app.js', 'engine.js', 'timer.js', 'optimizer.js', 'movements.js', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'sw.js']
+await generateArbitrationLibrary()
+
+const files = ['arbitrage.json', 'index.html', 'style.css', 'app.js', 'engine.js', 'timer.js', 'optimizer.js', 'movements.js', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'sw.js']
 const root = new URL('./', import.meta.url)
 const output = new URL('./dist/', root)
 await mkdir(output, { recursive: true })
