@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=97'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=97'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=98'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats } from './engine.js?v=98'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -780,13 +780,13 @@ if ('serviceWorker' in navigator) {
 
 
 const timerStorageKey = 'rotations-timer-v1'
-let countdown = { duration: 50 * 60000, remaining: 50 * 60000, deadline: null, finished: false }
+let countdown = { duration: 50 * 60000, remaining: 50 * 60000, defaultDuration: 50 * 60000, deadline: null, finished: false }
 let timerAudio = null
 let alarmNodes = []
 let alarmTimeout = null
 try {
   const saved = JSON.parse(localStorage.getItem(timerStorageKey))
-  if (saved && Number.isFinite(saved.duration) && saved.duration >= 60000 && saved.duration <= 180 * 60000 && Number.isFinite(saved.remaining) && saved.remaining >= 0 && saved.remaining <= 180 * 60000 && (saved.deadline === null || Number.isFinite(saved.deadline))) countdown = { ...saved, finished: saved.finished === true }
+  if (saved && Number.isFinite(saved.duration) && saved.duration >= 1000 && saved.duration <= 180 * 60000 && Number.isFinite(saved.remaining) && saved.remaining >= 0 && saved.remaining <= 180 * 60000 && (saved.deadline === null || Number.isFinite(saved.deadline))) countdown = { ...saved, defaultDuration: Number.isFinite(saved.defaultDuration) && saved.defaultDuration >= 1000 && saved.defaultDuration <= 180 * 60000 ? saved.defaultDuration : 50 * 60000, finished: saved.finished === true }
 } catch { /* Device storage may be unavailable. */ }
 function saveTimer() {
   try { localStorage.setItem(timerStorageKey, JSON.stringify(countdown)) } catch { /* Local storage is optional. */ }
@@ -833,6 +833,8 @@ function renderTimer() {
   const running = countdown.deadline !== null
   $('timer-start').classList.toggle('is-playing', running)
   $('timer-start').setAttribute('aria-label', running ? 'Mettre le minuteur en pause' : 'Lancer le minuteur')
+  $('timer-default').disabled = timerRemaining(countdown) <= 0
+  $('timer-default').title = `Enregistrer la durée actuelle par défaut (actuellement ${timerText(countdown.defaultDuration)})`
   $('timer-start-label').textContent = running ? 'Pause' : 'Lancer'
   $('timer-status').textContent = countdown.finished ? 'Temps écoulé !' : ''
 }
@@ -883,7 +885,16 @@ window.addEventListener('blur', stopTimerHold)
 window.addEventListener('hashchange', stopTimerHold)
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopTimerHold() })
 $('timer-reset').addEventListener('click', () => {
-  stopTimerHold(); stopTimerAlarm(); countdown.duration = 50 * 60000; countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
+  stopTimerHold(); stopTimerAlarm(); countdown.duration = countdown.defaultDuration; countdown.deadline = null; countdown.remaining = countdown.duration; countdown.finished = false; saveTimer(); renderTimer()
+})
+$('timer-default').addEventListener('click', () => {
+  stopTimerHold()
+  const remaining = Math.ceil(timerRemaining(countdown) / 1000) * 1000
+  if (remaining <= 0) return
+  countdown.defaultDuration = remaining
+  saveTimer(); renderTimer()
+  $('timer-default-label').textContent = 'Enregistré'
+  setTimeout(() => { $('timer-default-label').textContent = 'Par défaut' }, 1800)
 })
 $('timer-stop-alarm').addEventListener('click', stopTimerAlarm)
 document.addEventListener('visibilitychange', tickTimer)

@@ -21,9 +21,8 @@
       <a href="#placements" data-page="placements" aria-label="Placements" data-tooltip="Placements"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a>
       <a href="#rencontres" data-page="rencontres" aria-label="Rencontres" data-tooltip="Rencontres"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/></svg></a>
       <a href="#chanceux" data-page="chanceux" aria-label="Tirage Chanceux" data-tooltip="Tirage Chanceux"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/></svg></a>
-      <a href="#minuteur" data-page="minuteur" aria-label="Minuteur" data-tooltip="Minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="14" r="8"/><path d="M9 2h6M12 2v4m6 1 2-2M12 10v4l3 2"/></svg></a>
     </nav>
-    <a href="#minuteur" id="menu-timer" class="menu-timer" aria-label="Temps restant du minuteur">50:00</a>
+    <a href="#minuteur" id="menu-timer" data-page="minuteur" class="menu-timer" aria-label="Temps restant du minuteur">50:00</a>
   </header>
   <main>
     <div class="page-heading"><h2 id="page-title" tabindex="-1">Réglages</h2><p id="tournament-summary"></p></div>
@@ -69,6 +68,7 @@
       <div class="timer-actions">
         <button id="timer-start" class="primary action-icon" type="button" aria-label="Lancer le minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path class="timer-play" d="m8 4 12 8-12 8Z"/><path class="timer-pause" d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg><span id="timer-start-label" class="action-label">Lancer</span></button>
         <button id="timer-reset" class="secondary action-icon" type="button" aria-label="Réinitialiser le minuteur"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span class="action-label">Réinitialiser</span></button>
+        <button id="timer-default" class="secondary action-icon" type="button" aria-label="Enregistrer la durée actuelle par défaut" title="Enregistrer la durée actuelle par défaut"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h12l3 3v15H4V3Zm3 0v6h8V3M8 21v-7h8v7"/></svg><span id="timer-default-label" class="action-label">Par défaut</span></button>
         <button id="timer-stop-alarm" class="secondary" type="button" hidden>Arrêter la sonnerie</button>
       </div>
       <p id="timer-status" role="status" aria-live="polite"></p>
@@ -81,6 +81,6 @@
       <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
     </form>
   </dialog>
-  <script type="module" src="app.js?v=97"></script>
+  <script type="module" src="app.js?v=98"></script>
 </body>
 </html>
