@@ -72,8 +72,8 @@ test('movement explanations describe source rules, exceptions and real limits', 
   for (const count of [4, 8]) assert.equal(movementDetails(count, 'normal').label, 'Mouvement Club')
   for (const count of [7, 10, 15, 21, 29]) {
     const club = movementDetails(count, 'mixed')
-    assert.equal(club.label, 'Rotations équilibrées')
-    assert.match(club.description, /rencontres répétées/)
+    assert.equal(club.label, count === 7 ? 'Rotations équilibrées' : 'Rencontres prioritaires')
+    assert.match(club.description, /rencontres répétées/i)
     assert.deepEqual(club.exceptions, [])
   }
   const morts = movementDetails(21, 'morts')

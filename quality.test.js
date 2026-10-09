@@ -22,9 +22,9 @@ function quality(rotations, count, mode) {
   return { spread: Math.max(...visits) - Math.min(...visits), repeats }
 }
 
-test('special-table visits differ by at most one after every round', () => {
+test('mort visits and mixed tables without five players remain balanced after every round', () => {
   for (let count = 4; count <= 100; count++) for (const mode of ['morts', 'mixed']) {
-    if (!optionsFor(count).some(o => o.value === mode && !o.disabled)) continue
+    if (!optionsFor(count).some(o => o.value === mode && !o.disabled) || (mode === 'mixed' && count !== 7)) continue
     const plan = createPlan(count, maxRounds(count, mode), mode)
     const prefix = {}
     for (const [name, tables] of Object.entries(plan.rotations)) {
@@ -161,4 +161,44 @@ test('manual player order changes placements while preserving balanced encounter
   assert.throws(()=>createPlan(15,5,'morts',[],true,null,Array(15).fill(1)),/invalide/)
   const excluded = createPlan(13,3,'excluded',[2,4,6],true,null,Array.from({length:13},(_,i)=>13-i))
   assert.ok(excluded.rotations['Manche 1'].every(t=>t.joueurs.every(p=>p.id!==2)))
+})
+
+
+test('nine players prioritize minimum repeats ahead of visits to the table of five', () => {
+  // Each round creates 16 pair encounters, with only 36 distinct pairs available.
+  for (const rounds of [3,4,5,6,7]) {
+    const plan = createPlan(9,rounds,'mixed')
+    const rows = encountersFor(plan)
+    const repeats = rows.reduce((sum,row)=>sum+row.reduce((total,other)=>total+other.times-1,0),0)/2
+    assert.equal(repeats,16*rounds-36)
+    assert.ok(rows.every(row=>row.length===8))
+  }
+  const four = createPlan(9,4,'mixed'), three = createPlan(9,3,'mixed')
+  for(const name of Object.keys(three.rotations)) assert.deepEqual(four.rotations[name],three.rotations[name])
+  const visits = tableVisitsFor(four).map(player=>player.five)
+  assert.equal(Math.max(...visits)-Math.min(...visits),2)
+})
+
+
+test('every mixed table configuration with five players reduces repeats before balancing visits', () => {
+  for(const count of [13,14,15,17,18,19,21,29,41]) {
+    const plan = createPlan(count,4,'mixed')
+    const previous = new Map()
+    for(const tables of Object.values(plan.rotations)) {
+      const repeatCost = groups => groups.reduce((sum,group)=>sum+group.reduce((s,id,index)=>s+group.slice(index+1).filter(other=>previous.has([id,other].sort((a,b)=>a-b).join(':'))).length,0),0)
+      const groups = tables.map(table=>table.joueurs.map(player=>player.id))
+      const cost = repeatCost(groups)
+      // A swap across a four/five boundary must not reduce repeats merely
+      // because it would unbalance special-table visits.
+      for(let a=0;a<groups.length;a++) for(let b=a+1;b<groups.length;b++) {
+        if(groups[a].length===groups[b].length) continue
+        for(let ia=0;ia<groups[a].length;ia++) for(let ib=0;ib<groups[b].length;ib++) {
+          const candidate=groups.map(group=>[...group])
+          ;[candidate[a][ia],candidate[b][ib]]=[candidate[b][ib],candidate[a][ia]]
+          assert.ok(repeatCost(candidate)>=cost,`${count}: a cross-table swap still reduces repeats`)
+        }
+      }
+      for(const group of groups) for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++) previous.set([group[i],group[j]].sort((a,b)=>a-b).join(':'),true)
+    }
+  }
 })

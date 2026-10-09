@@ -58,8 +58,8 @@ export function movementDetails(count, mode) {
   const tables = mode === 'excluded' ? (count - 1) / 4 : createPlan(count, 1, mode).rotations['Manche 1'].length
   const details = { tables, limit, label: '', description: '', exceptions: [], note: '' }
   if (mode === 'mixed' || mode === 'morts') {
-    details.label = 'Rotations équilibrées'
-    details.description = 'Passages équilibrés, rencontres répétées limitées. Voir les placements.'
+    details.label = mode === 'mixed' && createPlan(count, 1, mode).rotations['Manche 1'].some(table => table.joueurs.length === 5) ? 'Rencontres prioritaires' : 'Rotations équilibrées'
+    details.description = mode === 'mixed' && createPlan(count, 1, mode).rotations['Manche 1'].some(table => table.joueurs.length === 5) ? 'Rencontres répétées minimisées en priorité, puis passages aux tables de cinq équilibrés autant que possible.' : 'Passages équilibrés, rencontres répétées limitées. Voir les placements.'
     if (mode === 'morts') details.note = 'Morts : N fixe, un par table.'
     return details
   }
@@ -211,5 +211,38 @@ export function normalizeExclusions(count, exclusions, rounds) {
     if (!Number.isInteger(id) || id < 1 || id > count || used.has(id)) return null
     used.add(id)
     return id
+  })
+}
+
+// Manual placement changes affect exactly one round; fixed morts never move.
+export function exchangeRoundPlayers(plan, roundIndex, firstId, secondId) {
+  const tables = Object.values(plan.rotations)[roundIndex]
+  if (!tables || firstId === secondId || !Number.isInteger(firstId) || !Number.isInteger(secondId)) return false
+  let first, second
+  for (const table of tables) table.joueurs.forEach((player,index) => {
+    if (player.id === firstId) first = {table,index}
+    if (player.id === secondId) second = {table,index}
+  })
+  if (!first || !second) return false
+  ;[first.table.joueurs[first.index],second.table.joueurs[second.index]] = [second.table.joueurs[second.index],first.table.joueurs[first.index]]
+  return true
+}
+export function applyRoundOrders(plan, orders) {
+  if (!orders || typeof orders !== 'object' || Array.isArray(orders)) return
+  Object.values(plan.rotations).forEach((tables, roundIndex) => {
+    const order = orders[roundIndex]
+    const players = tables.flatMap(table => table.joueurs)
+    if (!Array.isArray(order) || order.length !== players.length) return
+    const active = players.filter(player => player.id !== null)
+    const ids = new Set(active.map(player => player.id))
+    const requested = order.filter(id => id !== null)
+    if (requested.length !== active.length || new Set(requested).size !== requested.length || requested.some(id => !ids.has(id))) return
+    if (players.some((player,index) => (player.id === null) !== (order[index] === null))) return
+    const byId = new Map(active.map(player => [player.id,player]))
+    let index = 0
+    for (const table of tables) table.joueurs = table.joueurs.map(player => {
+      const id = order[index++]
+      return id === null ? player : byId.get(id)
+    })
   })
 }
