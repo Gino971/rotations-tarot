@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=117'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeRoundPlayers, applyRoundOrders } from './engine.js?v=117'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=119'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeRoundPlayers, applyRoundOrders } from './engine.js?v=119'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -341,7 +341,7 @@ function showPlan() {
 function renderEncounters() {
   const rows = encountersFor(plan), visits = tableVisitsFor(plan)
   const pending = plan.excluded.some(id => id === null)
-  $('encounters-note').textContent = `J7 (3) = trois manches à la même table que le joueur 7. Exempts compris, morts exclus.${pending ? ' Les manches sans exclu choisi ne sont pas comptées.' : ''}`
+  $('encounters-note').textContent = `Seules les rencontres répétées sont affichées. J7 (3) = trois manches à la même table que le joueur 7. Exempts compris, morts exclus.${pending ? ' Les manches sans exclu choisi ne sont pas comptées.' : ''}`
   const summary = $('encounters-summary')
   summary.replaceChildren()
   const repeats = rows.reduce((sum, row) => sum + row.reduce((s, player) => s + player.times - 1, 0), 0) / 2
@@ -353,14 +353,16 @@ function renderEncounters() {
   for (const part of parts) { const p = document.createElement('p'); p.textContent = part; summary.append(p) }
   const container = $('encounter-cards')
   container.replaceChildren()
-  for (const [index, row] of rows.entries()) {
+  for (const [index, encounters] of rows.entries()) {
+    const row = encounters.filter(encounter => encounter.times > 1)
+    if (!row.length) continue
     const card = document.createElement('article'); card.className = 'encounter-card'
     const title = document.createElement('h3'); title.textContent = `Joueur ${index + 1}`
     const list = document.createElement('p'); list.className = 'encounter-list'
     list.textContent = row.length ? row.map(({ id, times }) => `J${id} (${times})`).join(', ') : 'Aucune rencontre'
     const total = document.createElement('p'); total.className = 'encounter-meta'
     const repeated = row.reduce((sum, encounter) => sum + encounter.times - 1, 0)
-    total.textContent = `${row.length} joueurs rencontrés · ${repeated} rencontre${repeated > 1 ? 's' : ''} répétée${repeated > 1 ? 's' : ''}`
+    total.textContent = `${row.length} joueur${row.length > 1 ? 's' : ''} rencontré${row.length > 1 ? 's' : ''} plusieurs fois · ${repeated} rencontre${repeated > 1 ? 's' : ''} répétée${repeated > 1 ? 's' : ''}`
     card.append(title, list, total)
     if (plan.mode === 'morts' || plan.mode === 'mixed') {
       const passage = document.createElement('p'); passage.className = 'encounter-meta'
@@ -368,6 +370,9 @@ function renderEncounters() {
       card.append(passage)
     }
     container.append(card)
+  }
+  if (!container.children.length) {
+    const message = document.createElement('p'); message.textContent = 'Pas de rencontre répétée'; container.append(message)
   }
 }
 
@@ -423,14 +428,9 @@ function renderRound() {
   $('reset-swaps').disabled = Object.keys(manualRoundOrders).length === 0
   for (const [index, label] of [...$('exclusion-selectors').children].entries()) label.classList.toggle('current-round', index === round)
   const container = $('table-cards')
-  container.classList.toggle('all-rounds', round === -1)
+  container.classList.add('all-rounds')
   container.replaceChildren()
   delete container.dataset.round
-  if (round !== -1) {
-    container.dataset.round = round
-    buildDrawTables(Object.values(plan.rotations)[round], container)
-    return
-  }
   const encounteredPairs = new Set()
   let repetitions = 0
   Object.values(plan.rotations).forEach((tables, index) => {
@@ -442,6 +442,7 @@ function renderRound() {
         else encounteredPairs.add(key)
       }
     }
+    if (round !== -1 && index !== round) return
     const section = document.createElement('section'); section.className = 'round-plan'
     const title = document.createElement('h3')
     const label = document.createElement('span'); label.textContent = `Manche ${index + 1}`
