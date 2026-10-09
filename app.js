@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=108'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeRoundPlayers, applyRoundOrders } from './engine.js?v=108'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=117'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeRoundPlayers, applyRoundOrders } from './engine.js?v=117'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -15,6 +15,8 @@ let chipDrag = null
 let selectedChip = null
 let selectedChipContainer = null
 let manualRoundOrders = {}
+let swapUndo = []
+let swapRedo = []
 let manualRoundBasis = null
 let drawing = false
 let drawAudio = null
@@ -294,7 +296,7 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, manualRoundOrders, manualRoundBasis, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted, luckySound, luckyTarget, luckyBudget: Math.max(0, luckyBudget - (luckySegmentStart === null ? 0 : performance.now() - luckySegmentStart)) }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, manualRoundOrders, manualRoundBasis, swapUndo, swapRedo, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted, luckySound, luckyTarget, luckyBudget: Math.max(0, luckyBudget - (luckySegmentStart === null ? 0 : performance.now() - luckySegmentStart)) }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
@@ -374,7 +376,7 @@ function renderNavigation() {
   const select = $('current-placement')
   select.replaceChildren()
   select.setAttribute('aria-label', playerView ? 'Joueur' : 'Manche')
-  if (playerView) select.add(new Option('Tous', 0))
+  select.add(new Option(playerView ? 'Tous' : 'Toutes', 0))
   const total = playerView ? plan.count : plan.rounds
   for (let i = 1; i <= total; i++) {
     const option = new Option(String(i), i)
@@ -388,8 +390,8 @@ function renderNavigation() {
 }
 
 function updateNavigationButtons() {
-  const current = view === 'player' ? selectedPlayer : round
-  const last = view === 'player' ? plan.count : plan.rounds - 1
+  const current = view === 'player' ? selectedPlayer : round + 1
+  const last = view === 'player' ? plan.count : plan.rounds
   $('previous').disabled = current === 0
   $('next').disabled = current === last
 }
@@ -416,13 +418,54 @@ function renderPlayers() {
 }
 
 function renderRound() {
+  $('undo-swaps').disabled = swapUndo.length === 0
+  $('redo-swaps').disabled = swapRedo.length === 0
+  $('reset-swaps').disabled = Object.keys(manualRoundOrders).length === 0
   for (const [index, label] of [...$('exclusion-selectors').children].entries()) label.classList.toggle('current-round', index === round)
-  const tables = Object.values(plan.rotations)[round]
-  buildDrawTables(tables, $('table-cards'))
+  const container = $('table-cards')
+  container.classList.toggle('all-rounds', round === -1)
+  container.replaceChildren()
+  delete container.dataset.round
+  if (round !== -1) {
+    container.dataset.round = round
+    buildDrawTables(Object.values(plan.rotations)[round], container)
+    return
+  }
+  const encounteredPairs = new Set()
+  let repetitions = 0
+  Object.values(plan.rotations).forEach((tables, index) => {
+    for (const table of tables) {
+      const ids = table.joueurs.filter(player => player.id !== null).map(player => player.id)
+      for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) {
+        const key = `${Math.min(ids[a], ids[b])}:${Math.max(ids[a], ids[b])}`
+        if (encounteredPairs.has(key)) repetitions++
+        else encounteredPairs.add(key)
+      }
+    }
+    const section = document.createElement('section'); section.className = 'round-plan'
+    const title = document.createElement('h3')
+    const label = document.createElement('span'); label.textContent = `Manche ${index + 1}`
+    const total = document.createElement('span'); total.className = 'round-repetitions'
+    total.textContent = repetitions === 0 ? 'Pas de répétition' : `${repetitions} répétition${repetitions > 1 ? 's' : ''} au total`
+    total.title = 'Rencontres répétées cumulées jusqu’à cette manche, chaque paire comptée une seule fois par rencontre'
+    title.append(label)
+    if (index > 0) title.append(total)
+    const grid = document.createElement('div'); grid.className = 'table-grid'; grid.dataset.round = index
+    buildDrawTables(tables, grid)
+    section.append(title, grid); container.append(section)
+  })
 }
 
 function selectView(nextView) {
   view = nextView
+  const toggle = $('toggle-placement-view')
+  const target = view === 'player' ? 'round' : 'player'
+  toggle.replaceChildren($(`by-${target}`).querySelector('svg').cloneNode(true))
+  const label = document.createElement('span'); label.className = 'action-label'
+  label.textContent = view === 'player' ? 'Par joueur' : 'Par table'
+  toggle.append(label)
+  toggle.setAttribute('aria-label', target === 'round' ? 'Afficher par table' : 'Afficher par joueur')
+  toggle.title = toggle.getAttribute('aria-label')
   $('player-view').hidden = view !== 'player'; $('round-view').hidden = view !== 'round'
   for (const name of ['player', 'round']) {
     $(`by-${name}`).classList.toggle('active', name === view)
@@ -440,7 +483,7 @@ function recalculate() {
     renderExclusionSelectors()
     plan = createPlan(Number($('count').value), Number($('rounds').value), mode, manualExclusions, true, drawSeed, manualDrawOrder)
     const basis = roundOrderBasis()
-    if (manualRoundBasis !== basis) { manualRoundOrders = {}; manualRoundBasis = basis }
+    if (manualRoundBasis !== basis) { manualRoundOrders = {}; swapUndo = []; swapRedo = []; manualRoundBasis = basis }
     applyRoundOrders(plan, manualRoundOrders)
     round = Math.min(round, plan.rounds - 1)
     if (selectedPlayer > plan.count) selectedPlayer = 0
@@ -501,9 +544,12 @@ function renderDrawOrder() {
 
 function exchangeChips(firstId, secondId, container = $('draw-order')) {
   if (drawing || firstId === secondId) return
-  if (container === $('table-cards')) {
-    if (!exchangeRoundPlayers(plan, round, firstId, secondId)) return
-    manualRoundOrders[round] = Object.values(plan.rotations)[round].flatMap(table => table.joueurs.map(player => player.id))
+  if (container.closest('#table-cards')) {
+    const roundIndex = Number(container.dataset.round)
+    const previousOrders = structuredClone(manualRoundOrders)
+    if (!exchangeRoundPlayers(plan, roundIndex, firstId, secondId)) return
+    swapUndo.push(previousOrders); swapRedo = []
+    manualRoundOrders[roundIndex] = Object.values(plan.rotations)[roundIndex].flatMap(table => table.joueurs.map(player => player.id))
     manualRoundBasis = roundOrderBasis()
     clearChipSelection()
     renderPlayers(); renderRound(); renderEncounters(); persist()
@@ -526,7 +572,7 @@ function startChipDrag(event) {
   const chip = event.target.closest('.draw-player') || event.target.closest('[data-slot]')?.querySelector('.draw-player')
   if (drawing || chipDrag || !chip || !chip.parentElement.hasAttribute('data-slot') || event.button !== 0) return
   event.preventDefault()
-  chipDrag = { container: event.currentTarget, chip, id: Number(chip.dataset.player), pointer: event.pointerId, x: event.clientX, y: event.clientY, ghost: null, target: null }
+  chipDrag = { container: chip.closest('[data-round], #draw-order'), chip, id: Number(chip.dataset.player), pointer: event.pointerId, x: event.clientX, y: event.clientY, ghost: null, target: null }
   chip.setPointerCapture(event.pointerId)
 }
 $('draw-order').addEventListener('pointerdown', startChipDrag)
@@ -579,7 +625,7 @@ function clearChipSelection() {
 function selectChipForExchange(chip) {
   if (drawing || !chip.parentElement.hasAttribute('data-slot')) return
   const id = Number(chip.dataset.player)
-  const container = chip.closest('#table-cards, #draw-order')
+  const container = chip.closest('[data-round], #draw-order')
   if (selectedChipContainer !== container) clearChipSelection()
   if (selectedChip === id) { clearChipSelection(); return }
   if (selectedChip !== null) {
@@ -599,8 +645,10 @@ function handleChipKey(event) {
   if (drawing || !chip || !chip.parentElement.hasAttribute('data-slot') || !['Enter', ' '].includes(event.key)) return
   event.preventDefault()
   const id = Number(chip.dataset.player)
+  const roundIndex = chip.closest('[data-round]')?.dataset.round
   selectChipForExchange(chip)
-  event.currentTarget.querySelector(`[data-player="${id}"]`)?.focus()
+  const context = roundIndex === undefined ? event.currentTarget : event.currentTarget.matches('[data-round]') ? event.currentTarget : event.currentTarget.querySelector(`[data-round="${roundIndex}"]`)
+  context?.querySelector(`[data-player="${id}"]`)?.focus()
 }
 $('draw-order').addEventListener('keydown', handleChipKey)
 $('table-cards').addEventListener('keydown', handleChipKey)
@@ -744,18 +792,40 @@ $('draw').addEventListener('click', async () => {
     $('draw').setAttribute('aria-label', 'Tirer au sort')
   }
 })
-$('reset-draw').addEventListener('click', () => { manualRoundOrders = {}; drawSeed = null; manualDrawOrder = null; showDrawResult = false; recalculate() })
+$('reset-draw').addEventListener('click', () => { manualRoundOrders = {}; swapUndo = []; swapRedo = []; drawSeed = null; manualDrawOrder = null; showDrawResult = false; recalculate() })
 $('setup-form').addEventListener('submit', event => { event.preventDefault(); recalculate(); if (plan) location.hash = 'placements' })
 window.addEventListener('hashchange', () => showPage(true))
+$('toggle-placement-view').addEventListener('click', () => selectView(view === 'player' ? 'round' : 'player'))
 $('by-player').addEventListener('click', () => selectView('player'))
 $('by-round').addEventListener('click', () => selectView('round'))
 for (const id of ['by-player', 'by-round']) $(id).addEventListener('keydown', event => {
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectView(view === 'player' ? 'round' : 'player'); $(`by-${view}`).focus() }
 })
+$('undo-swaps').addEventListener('click', () => {
+  if (!swapUndo.length) return
+  clearChipSelection()
+  swapRedo.push(structuredClone(manualRoundOrders))
+  manualRoundOrders = swapUndo.pop()
+  recalculate()
+})
+$('redo-swaps').addEventListener('click', () => {
+  if (!swapRedo.length) return
+  clearChipSelection()
+  swapUndo.push(structuredClone(manualRoundOrders))
+  manualRoundOrders = swapRedo.pop()
+  recalculate()
+})
+$('reset-swaps').addEventListener('click', () => {
+  if (!Object.keys(manualRoundOrders).length) return
+  clearChipSelection()
+  swapUndo.push(structuredClone(manualRoundOrders)); swapRedo = []
+  manualRoundOrders = {}
+  recalculate()
+})
 $('current-placement').addEventListener('change', () => changePlacement(Number($('current-placement').value)))
 for (const [id, step] of [['previous', -1], ['next', 1]]) $(id).addEventListener('click', () => {
   const value = Number($('current-placement').value) + step
-  const min = view === 'player' ? 0 : 1
+  const min = 0
   const max = view === 'player' ? plan.count : plan.rounds
   if (value >= min && value <= max) changePlacement(value)
 })
@@ -771,6 +841,9 @@ try {
     drawSeed = Number.isInteger(saved.drawSeed) && saved.drawSeed >= 0 && saved.drawSeed <= 0xffffffff ? saved.drawSeed : null
     manualDrawOrder = Array.isArray(saved.manualDrawOrder) && saved.manualDrawOrder.length === saved.count && new Set(saved.manualDrawOrder).size === saved.count && saved.manualDrawOrder.every(id => Number.isInteger(id) && id >= 1 && id <= saved.count) ? saved.manualDrawOrder : null
     manualRoundOrders = saved.manualRoundOrders && typeof saved.manualRoundOrders === 'object' && !Array.isArray(saved.manualRoundOrders) ? saved.manualRoundOrders : {}
+    const validHistory = value => Array.isArray(value) && value.every(entry => entry && typeof entry === 'object' && !Array.isArray(entry))
+    swapUndo = validHistory(saved.swapUndo) ? saved.swapUndo : Object.keys(manualRoundOrders).length ? [{}] : []
+    swapRedo = validHistory(saved.swapRedo) ? saved.swapRedo : []
     manualRoundBasis = typeof saved.manualRoundBasis === 'string' ? saved.manualRoundBasis : null
     showDrawResult = drawSeed !== null || manualDrawOrder !== null
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed, manualDrawOrder)
@@ -782,7 +855,7 @@ try {
     luckySound = saved.luckySound !== false
     renderLuckySound()
     mode = savedMode; $('count').value = saved.count; updateOptions(); $('rounds').value = saved.rounds; renderExclusionSelectors()
-    view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(0, Math.min(plan.rounds - 1, Number(saved.round) || 0))
+    view = saved.view === 'round' ? 'round' : 'player'; round = Math.max(-1, Math.min(plan.rounds - 1, Number(saved.round) || 0))
     selectedPlayer = Number.isInteger(saved.selectedPlayer) && saved.selectedPlayer >= 0 && saved.selectedPlayer <= plan.count ? saved.selectedPlayer : 0
   }
 } catch { /* Invalid or unavailable device storage: start a new setup. */ }
