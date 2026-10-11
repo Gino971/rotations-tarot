@@ -1,11 +1,11 @@
 // Build each round independently of the requested total, preserving its prefix.
 // Tables of five prioritize repeats; tables with morts prioritize balanced visits.
 // Several deterministic starts and local swaps then reduce repeated encounters.
-export function optimizeRotations(rotations, count) {
+export function optimizeRotations(rotations, count, fixedRounds = 1, preserveFixed = false) {
   const source = Object.values(rotations).map(tables => tables.map(table => ({ ...table, joueurs: table.joueurs.map(({ nom, numero, id }) => ({ nom, numero, id })) })))
   const types = source[0].map(t => t.joueurs.some(p => p.id === null) ? 3 : t.joueurs.length)
   if (source[0].length < 2) return rotations
-  if (count === 9 && types.length === 2 && types.includes(4) && types.includes(5)) return optimizeNinePlayers(source, playersForNine(source))
+  if (count === 9 && types.length === 2 && types.includes(4) && types.includes(5)) return optimizeNinePlayers(source, playersForNine(source), fixedRounds)
   const meetingsFirst = types.includes(5) && !source[0].some(table => table.joueurs.some(player => player.id === null))
   const categories = [...new Set(types.filter(t => t !== 4))].sort((a, b) => a - b)
   const visits = Object.fromEntries(categories.map(type => [type, new Uint8Array(count + 1)]))
@@ -30,6 +30,18 @@ export function optimizeRotations(rotations, count) {
   },0)
   const score = groups => groups.reduce((sum, group) => sum + group.reduce((s, a, i) => s + group.slice(i + 1).reduce((v, b) => v + weight(a, b), 0), 0), 0) + (meetingsFirst ? fairness(groups)*10000 : 0)
   for (let round = 0; round < source.length; round++) {
+    if (round < fixedRounds) {
+      result[`Manche ${round + 1}`] = preserveFixed ? Object.values(rotations)[round] : source[round]
+      for (const table of source[round]) {
+        const type = table.joueurs.some(player => player.id === null) ? 3 : table.joueurs.length
+        const group = table.joueurs.filter(player => player.id !== null)
+        for (const a of group) {
+          if (visits[type]) visits[type][a.id]++
+          for (const b of group) if (a !== b) meetings[a.id * (count + 1) + b.id]++
+        }
+      }
+      continue
+    }
     let best, bestScore = Infinity
     const minimumFairness = categories.reduce((sum,type) => {
       const total = visits[type].reduce((value,n)=>value+n,0) + source[0].filter((_,index)=>types[index] === type).reduce((value,table)=>value+table.joueurs.filter(player=>player.id!==null).length,0)
@@ -104,7 +116,7 @@ function playersForNine(source) {
 }
 // For two tables at nine players, examine every possible five-player group.
 // Repeats take priority, then visits to the table of five, then meeting frequency.
-function optimizeNinePlayers(source, players) {
+function optimizeNinePlayers(source, players, fixedRounds) {
   const partitions = []
   for (let mask=0; mask<512; mask++) {
     const five = players.filter((_,index) => mask & (1<<index))
@@ -114,7 +126,7 @@ function optimizeNinePlayers(source, players) {
   const fourIndex = source[0].findIndex(table => table.joueurs.length === 4)
   for (let round=0; round<source.length; round++) {
     let chosen, best = Infinity
-    if(round===0) chosen = [source[0][fourIndex].joueurs,source[0][1-fourIndex].joueurs]
+    if(round<fixedRounds) chosen = [source[round][fourIndex].joueurs,source[round][1-fourIndex].joueurs]
     else for(const groups of partitions) {
       let repeats=0, frequency=0
       for(const group of groups) for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++) {

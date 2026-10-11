@@ -32,3 +32,53 @@ test('manual round orders survive serialization and reject missing players or mo
   assert.deepEqual(unchanged,original)
   assert.equal(exchangeRoundPlayers(unchanged,1,active[0].id,null),false)
 })
+
+test('editing the first round rebuilds later rounds without adding repeats to a normal movement', async () => {
+  const { exchangeAndRecalculate } = await import('./engine.js')
+  const plan = createPlan(20, 4, 'normal')
+  const before = structuredClone(plan)
+  const a = plan.rotations['Manche 1'][0].joueurs[0].id
+  const b = plan.rotations['Manche 1'][1].joueurs[1].id
+  const repeats = value => encountersFor(value).flat().reduce((sum,pair)=>sum+pair.times-1,0)/2
+  assert.equal(exchangeAndRecalculate(plan,0,a,b),true)
+  assert.equal(repeats(plan),repeats(before))
+  assert.notDeepEqual(plan.rotations['Manche 2'],before.rotations['Manche 2'])
+  const orders = Object.fromEntries(Object.values(plan.rotations).map((tables,index)=>[index,tables.flatMap(table=>table.joueurs.map(player=>player.id))]))
+  const restored = structuredClone(before)
+  applyRoundOrders(restored,JSON.parse(JSON.stringify(orders)))
+  for (let id = 1; id <= plan.count; id++) assert.deepEqual(positionsFor(restored,id),positionsFor(plan,id))
+  assert.deepEqual(encountersFor(restored),encountersFor(plan))
+})
+
+test('later exchanges preserve earlier rounds and every active player, including mixed and mort tables', async () => {
+  const { exchangeAndRecalculate } = await import('./engine.js')
+  for (const [count,mode] of [[20,'normal'],[9,'mixed'],[17,'morts'],[17,'excluded']]) {
+    const plan = createPlan(count,4,mode,mode==='excluded'?[17]:[])
+    const before = structuredClone(plan)
+    const active = plan.rotations['Manche 2'].flatMap(table=>table.joueurs).filter(player=>player.id!==null)
+    assert.equal(exchangeAndRecalculate(plan,1,active[0].id,active.at(-1).id),true)
+    assert.deepEqual(plan.rotations['Manche 1'],before.rotations['Manche 1'])
+    for (const tables of Object.values(plan.rotations)) {
+      const ids = tables.flatMap(table=>table.joueurs).filter(player=>player.id!==null).map(player=>player.id)
+      assert.equal(new Set(ids).size,active.length)
+      assert.deepEqual(ids.sort((a,b)=>a-b),active.map(player=>player.id).sort((a,b)=>a-b))
+      for(const table of tables) if(table.joueurs.some(player=>player.id===null)) assert.equal(table.joueurs[0].id,null)
+    }
+  }
+})
+
+
+test('swapping two South seats after a random draw preserves every encounter count', async () => {
+  const { exchangeAndRecalculate } = await import('./engine.js')
+  for (const seed of [null,1,98765,4294967295]) {
+    const plan = createPlan(20,4,'normal',[],true,seed)
+    const first = plan.rotations['Manche 1']
+    const a = first[0].joueurs[1].id, b = first[1].joueurs[1].id
+    const before = encountersFor(plan)
+    assert.equal(exchangeAndRecalculate(plan,0,a,b),true)
+    const mapped = id => id === a ? b : id === b ? a : id
+    const expected = Array.from({length:20},(_,index)=>before[mapped(index+1)-1].map(pair=>({...pair,id:mapped(pair.id)})).sort((a,b)=>a.id-b.id))
+    assert.deepEqual(encountersFor(plan),expected)
+    assert.equal(encountersFor(plan).flat().reduce((sum,pair)=>sum+pair.times-1,0),0)
+  }
+})

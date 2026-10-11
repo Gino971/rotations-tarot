@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=119'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeRoundPlayers, applyRoundOrders } from './engine.js?v=119'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=123'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=123'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -431,15 +431,16 @@ function renderRound() {
   container.classList.add('all-rounds')
   container.replaceChildren()
   delete container.dataset.round
-  const encounteredPairs = new Set()
+  const encounteredPairs = new Map()
   let repetitions = 0
   Object.values(plan.rotations).forEach((tables, index) => {
     for (const table of tables) {
       const ids = table.joueurs.filter(player => player.id !== null).map(player => player.id)
       for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) {
         const key = `${Math.min(ids[a], ids[b])}:${Math.max(ids[a], ids[b])}`
-        if (encounteredPairs.has(key)) repetitions++
-        else encounteredPairs.add(key)
+        const previous = encounteredPairs.get(key) || 0
+        if (previous) repetitions++
+        encounteredPairs.set(key, previous + 1)
       }
     }
     if (round !== -1 && index !== round) return
@@ -450,7 +451,19 @@ function renderRound() {
     total.textContent = repetitions === 0 ? 'Pas de répétition' : `${repetitions} répétition${repetitions > 1 ? 's' : ''} au total`
     total.title = 'Rencontres répétées cumulées jusqu’à cette manche, chaque paire comptée une seule fois par rencontre'
     title.append(label)
-    if (index > 0) title.append(total)
+    if (index > 0) {
+      title.append(total)
+      const repeated = [...encounteredPairs].filter(([, times]) => times > 1)
+      if (repeated.length) {
+        const details = document.createElement('span'); details.className = 'round-repeat-details'
+        details.textContent = repeated.map(([key, times]) => {
+          const [a, b] = key.split(':')
+          return `J${a}–J${b} (${times})`
+        }).join(' · ')
+        details.title = 'Nombre de rencontres de chaque paire jusqu’à cette manche'
+        title.append(details)
+      }
+    }
     const grid = document.createElement('div'); grid.className = 'table-grid'; grid.dataset.round = index
     buildDrawTables(tables, grid)
     section.append(title, grid); container.append(section)
@@ -548,9 +561,11 @@ function exchangeChips(firstId, secondId, container = $('draw-order')) {
   if (container.closest('#table-cards')) {
     const roundIndex = Number(container.dataset.round)
     const previousOrders = structuredClone(manualRoundOrders)
-    if (!exchangeRoundPlayers(plan, roundIndex, firstId, secondId)) return
+    if (!exchangeAndRecalculate(plan, roundIndex, firstId, secondId)) return
     swapUndo.push(previousOrders); swapRedo = []
-    manualRoundOrders[roundIndex] = Object.values(plan.rotations)[roundIndex].flatMap(table => table.joueurs.map(player => player.id))
+    Object.values(plan.rotations).forEach((tables, index) => {
+      if (index >= roundIndex) manualRoundOrders[index] = tables.flatMap(table => table.joueurs.map(player => player.id))
+    })
     manualRoundBasis = roundOrderBasis()
     clearChipSelection()
     renderPlayers(); renderRound(); renderEncounters(); persist()

@@ -1,5 +1,5 @@
 import { calculRotationsRainbow, getMovementInfo } from './movements.js'
-import { optimizeRotations } from './optimizer.js'
+import { optimizeRotations } from './optimizer.js?v=123'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -245,4 +245,21 @@ export function applyRoundOrders(plan, orders) {
       return id === null ? player : byId.get(id)
     })
   })
+}
+
+// Keep played/edited rounds fixed and rebuild the remainder from their encounters.
+export function exchangeAndRecalculate(plan, roundIndex, firstId, secondId) {
+  if (!exchangeRoundPlayers(plan, roundIndex, firstId, secondId)) return false
+  const rounds = Object.values(plan.rotations)
+  const players = new Map(rounds[roundIndex].flatMap(table => table.joueurs).map(player => [player.id, player]))
+  // Propagate the new starting positions through the existing movement first.
+  // This preserves a repeat-free movement when editing its first round.
+  for (const tables of rounds.slice(roundIndex + 1)) for (const table of tables) {
+    // Players may be at different tables: relabel using the same player objects.
+    table.joueurs = table.joueurs.map(player => player.id === firstId
+      ? players.get(secondId)
+      : player.id === secondId ? players.get(firstId) : player)
+  }
+  if (roundIndex > 0 && roundIndex + 1 < plan.rounds) plan.rotations = optimizeRotations(plan.rotations, plan.count, roundIndex + 1, true)
+  return true
 }
