@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=125'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, drawOrderWithNorth, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=125'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=126'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, drawOrderWithNorth, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=126'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -301,18 +301,19 @@ function persist() {
   } catch { /* Device storage may be unavailable. */ }
 }
 
-const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux', minuteur: 'Minuteur', arbitrage: 'Arbitrage' }
+const pages = { reglages: 'Réglages', placements: 'Placements', rencontres: 'Rencontres', chanceux: 'Tirage au sort du chanceux', minuteur: 'Minuteur', arbitrage: 'Arbitrage', aide: 'Aide' }
 
 function showPage(focus = false) {
   const requested = location.hash.slice(1)
   const page = Object.hasOwn(pages, requested) ? requested : 'reglages'
-  if (!['reglages', 'arbitrage', 'minuteur'].includes(page) && !plan) { location.hash = 'reglages'; return }
+  if (!['reglages', 'arbitrage', 'minuteur', 'aide'].includes(page) && !plan) { location.hash = 'reglages'; return }
   $('setup').hidden = page !== 'reglages'
   $('results').hidden = page !== 'placements'
   $('encounters').hidden = page !== 'rencontres'
   $('lucky').hidden = page !== 'chanceux'
   $('timer-panel').hidden = page !== 'minuteur'
   $('arbitrage-panel').hidden = page !== 'arbitrage'
+  $('help-panel').hidden = page !== 'aide'
   if (page === 'arbitrage') queueMicrotask(loadArbitration)
   if (page !== 'chanceux' && luckyTimer !== null) { pauseLucky(); renderLucky(); persist() }
   const heading = document.querySelector('.page-heading')
@@ -322,8 +323,8 @@ function showPage(focus = false) {
   if (page === 'placements') heading.append(controls)
   else $('results').prepend(controls)
   $('page-title').textContent = pages[page]
-  document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur', 'arbitrage'].includes(page))
-  $('tournament-summary').hidden = ['chanceux', 'minuteur', 'arbitrage'].includes(page)
+  document.querySelector('.page-heading').classList.toggle('lucky-heading', ['chanceux', 'minuteur', 'arbitrage', 'aide'].includes(page))
+  $('tournament-summary').hidden = ['chanceux', 'minuteur', 'arbitrage', 'aide'].includes(page)
   document.title = `${pages[page]} · Rotations tarot`
   for (const link of document.querySelectorAll('[data-page]')) {
     if (link.dataset.page === page) link.setAttribute('aria-current', 'page')

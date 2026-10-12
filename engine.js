@@ -1,5 +1,5 @@
 import { calculRotationsRainbow, getMovementInfo } from './movements.js'
-import { optimizeRotations } from './optimizer.js?v=125'
+import { optimizeRotations } from './optimizer.js?v=126'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 

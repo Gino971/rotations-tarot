@@ -149,3 +149,5 @@ main:has(.settings-heading){padding-top:0!important}.page-heading.settings-headi
 .round-plan > h3{flex-wrap:wrap;row-gap:5px}.round-repeat-details{font-size:12px;font-weight:400;color:var(--muted);line-height:1.5;overflow-wrap:anywhere}
 
 #north-options{margin:0 0 20px}#north-options summary{cursor:pointer;font-size:14px;font-weight:600}#north-selectors{margin-top:14px}#north-selectors select{min-height:38px;font-size:14px;padding:6px 10px}
+
+.help-panel{max-width:760px}.help-panel details{background:white;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px}.help-panel summary{font-size:15px;font-weight:650;cursor:pointer;color:var(--green)}.help-panel p{font-size:14px;margin-top:12px}.topbar .page-navigation{flex-shrink:1}@media(max-width:500px){.topbar{gap:6px;padding:0 8px}.topbar .page-navigation{gap:1px}.topbar .page-navigation a{width:30px}.topbar .brand-icon{display:none}}
