@@ -1,5 +1,5 @@
 import { calculRotationsRainbow, getMovementInfo } from './movements.js'
-import { optimizeRotations } from './optimizer.js?v=123'
+import { optimizeRotations } from './optimizer.js?v=125'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -262,4 +262,22 @@ export function exchangeAndRecalculate(plan, roundIndex, firstId, secondId) {
   }
   if (roundIndex > 0 && roundIndex + 1 < plan.rounds) plan.rotations = optimizeRotations(plan.rotations, plan.count, roundIndex + 1, true)
   return true
+}
+
+export function drawOrderWithNorth(count, mode, exclusions, seed, assignments = {}) {
+  const order = drawOrder(count, seed)
+  const first = createPlan(count, 1, mode, exclusions, true, seed)
+  const used = new Set()
+  for (const table of first.rotations['Manche 1']) {
+    const requested = Number(assignments[table.table])
+    if (!requested) continue
+    if (!Number.isInteger(requested) || requested < 1 || requested > count || used.has(requested) || first.excluded[0] === requested || table.joueurs[0].id === null) throw new Error('Attribution Nord invalide.')
+    used.add(requested)
+    const current = table.joueurs[0].id
+    if (current === requested) continue
+    const a = order.indexOf(current), b = order.indexOf(requested)
+    ;[order[a], order[b]] = [order[b], order[a]]
+    for (const tables of Object.values(first.rotations)) for (const t of tables) t.joueurs = t.joueurs.map(p => p.id === current ? {...p,id:requested} : p.id === requested ? {...p,id:current} : p)
+  }
+  return order
 }

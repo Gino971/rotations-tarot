@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=123'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=123'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=125'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, drawOrderWithNorth, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=125'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'
@@ -11,6 +11,7 @@ let selectedPlayer = 0
 let manualExclusions = []
 let drawSeed = null
 let manualDrawOrder = null
+let northAssignments = {}
 let chipDrag = null
 let selectedChip = null
 let selectedChipContainer = null
@@ -296,7 +297,7 @@ function renderExclusionSelectors() {
 
 function persist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, manualRoundOrders, manualRoundBasis, swapUndo, swapRedo, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted, luckySound, luckyTarget, luckyBudget: Math.max(0, luckyBudget - (luckySegmentStart === null ? 0 : performance.now() - luckySegmentStart)) }))
+    localStorage.setItem(storageKey, JSON.stringify({ count: plan.count, rounds: plan.rounds, mode: plan.mode, exclusions: manualExclusions, drawSeed, manualDrawOrder, northAssignments, manualRoundOrders, manualRoundBasis, swapUndo, swapRedo, drawSound: drawSound, view, round, selectedPlayer, luckyRemoved: [...luckyRemoved], luckyStarted, luckySound, luckyTarget, luckyBudget: Math.max(0, luckyBudget - (luckySegmentStart === null ? 0 : performance.now() - luckySegmentStart)) }))
   } catch { /* Device storage may be unavailable. */ }
 }
 
@@ -333,6 +334,7 @@ function showPage(focus = false) {
 
 function showPlan() {
   $('draw-status').textContent = manualDrawOrder !== null ? 'Placement manuel enregistré.' : drawSeed === null ? 'Première manche : ordre des numéros.' : 'Tirage enregistré pour ce tournoi.'
+  renderNorthSelectors()
   renderDrawOrder()
   $('tournament-summary').textContent = `${plan.count} joueurs · ${plan.rounds} manches · ${optionsFor(plan.count).find(option => option.value === plan.mode).label}`
   renderPlayers(); renderRound(); renderEncounters(); renderLucky(); selectView(view); persist(); showPage()
@@ -505,7 +507,7 @@ function recalculate() {
   } catch (error) { $('error').textContent = error.message; plan = null; $('tournament-summary').textContent = ''; location.hash = 'reglages'; showPage() }
 }
 
-$('count').addEventListener('change', () => { manualExclusions = []; drawSeed = null; manualDrawOrder = null; showDrawResult = false; chipSuits.clear(); updateOptions(); recalculate() })
+$('count').addEventListener('change', () => { manualExclusions = []; northAssignments = {}; drawSeed = null; manualDrawOrder = null; showDrawResult = false; chipSuits.clear(); updateOptions(); recalculate() })
 $('rounds').addEventListener('change', () => { manualExclusions = manualExclusions.slice(0, Number($('rounds').value)); renderExclusionSelectors(); recalculate() })
 function buildDrawChips(order, container) {
   selectedChip = null
@@ -547,6 +549,36 @@ function buildDrawChips(order, container) {
     const position = document.createElement('span'); position.className = 'chip-position'; position.textContent = excluded ? 'Exclu' : ['N', 'S', 'E', 'O', 'X1', 'X2'][index - groupStart]
     position.setAttribute('aria-label', excluded ? 'Exclu' : seats[index - groupStart])
     slot.append(chip, position); group.append(slot)
+  }
+}
+
+function renderNorthSelectors() {
+  const container = $('north-selectors'); container.replaceChildren()
+  const available = Object.values(plan.rotations)[0].filter(table => table.joueurs[0]?.id !== null)
+  const used = new Set()
+  const valid = {}
+  for (const table of available) {
+    const id = Number(northAssignments[table.table])
+    if (Number.isInteger(id) && id >= 1 && id <= plan.count && id !== plan.excluded[0] && !used.has(id)) { valid[table.table] = id; used.add(id) }
+  }
+  northAssignments = valid
+  $('north-options').hidden = !available.length
+  for (const table of available) {
+    const label = document.createElement('label'); label.textContent = `Nord · Table ${table.table}`
+    const select = document.createElement('select'); select.add(new Option('Au hasard', '0'))
+    for (let id = 1; id <= plan.count; id++) {
+      if (id === plan.excluded[0]) continue
+      const option = new Option(`Joueur ${id}`, id)
+      option.disabled = used.has(id) && valid[table.table] !== id
+      select.add(option)
+    }
+    select.value = String(valid[table.table] || 0)
+    select.addEventListener('change', () => {
+      if (Number(select.value)) northAssignments[table.table] = Number(select.value)
+      else delete northAssignments[table.table]
+      renderNorthSelectors(); persist()
+    })
+    label.append(select); container.append(label)
   }
 }
 
@@ -770,13 +802,22 @@ $('draw').addEventListener('click', async () => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const count = Number($('count').value)
     const seed = new Uint32Array(1); crypto.getRandomValues(seed)
-    const finalOrder = drawSlotsFor(count, mode, manualExclusions, seed[0])
+    const constrainedOrder = Object.keys(northAssignments).length ? drawOrderWithNorth(count, mode, manualExclusions, seed[0], northAssignments) : null
+    const finalOrder = drawSlotsFor(count, mode, manualExclusions, seed[0], constrainedOrder)
     const startingOrder = drawSlotsFor(count, mode, manualExclusions, drawSeed, manualDrawOrder)
+    const fixedNorthSlots = new Set()
+    for (const id of Object.values(northAssignments)) {
+      const destination = finalOrder.indexOf(Number(id))
+      const source = startingOrder.indexOf(Number(id))
+      if (destination < 0 || source < 0) continue
+      ;[startingOrder[destination], startingOrder[source]] = [startingOrder[source], startingOrder[destination]]
+      fixedNorthSlots.add(destination)
+    }
     const visibleOrder = [...$('draw-order').querySelectorAll('[data-player]')].map(token => token.dataset.player === 'mort' ? null : Number(token.dataset.player))
     if (visibleOrder.length !== startingOrder.length || visibleOrder.some((id, index) => id !== startingOrder[index])) buildDrawChips(startingOrder, $('draw-order'))
     await new Promise(resolve => setTimeout(resolve, 600))
     $('draw-status').textContent = 'Mélange des jetons…'
-    const slots = [...$('draw-order').querySelectorAll('[data-slot]')]
+    const slots = [...$('draw-order').querySelectorAll('[data-slot]')].filter(slot => !fixedNorthSlots.has(Number(slot.dataset.slot)))
     const started = performance.now()
     while (performance.now() - started < 4500) {
       const shuffled = [...slots]
@@ -795,7 +836,7 @@ $('draw').addEventListener('click', async () => {
     const moves = finalOrder.flatMap((id, index) => destinations.has(index) ? [[tokens.get(id), destinations.get(index)]] : [])
     await moveDrawPlayers(moves, reduced, Math.max(100, 5000 - (performance.now() - started)))
     drawSeed = seed[0]
-    manualDrawOrder = null
+    manualDrawOrder = constrainedOrder
     showDrawResult = true
     recalculate()
     drawTone(523, 0.15); drawTone(659, 0.15, 0.12); drawTone(784, 0.24, 0.24)
@@ -861,6 +902,7 @@ try {
     swapUndo = validHistory(saved.swapUndo) ? saved.swapUndo : Object.keys(manualRoundOrders).length ? [{}] : []
     swapRedo = validHistory(saved.swapRedo) ? saved.swapRedo : []
     manualRoundBasis = typeof saved.manualRoundBasis === 'string' ? saved.manualRoundBasis : null
+    northAssignments = saved.northAssignments && typeof saved.northAssignments === 'object' && !Array.isArray(saved.northAssignments) ? saved.northAssignments : {}
     showDrawResult = drawSeed !== null || manualDrawOrder !== null
     plan = createPlan(saved.count, saved.rounds, savedMode, manualExclusions, true, drawSeed, manualDrawOrder)
     luckyCount = plan.count

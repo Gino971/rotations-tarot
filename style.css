@@ -147,3 +147,5 @@ main:has(.settings-heading){padding-top:0!important}.page-heading.settings-headi
 .page-heading #page-title{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.page-heading.placements-heading{grid-template-columns:1fr}.placements-heading .result-controls{grid-column:1;justify-self:start}.page-heading:has(#tournament-summary[hidden]):not(.placements-heading){display:none}.page-heading.settings-heading:has(#tournament-summary:empty){display:none}
 
 .round-plan > h3{flex-wrap:wrap;row-gap:5px}.round-repeat-details{font-size:12px;font-weight:400;color:var(--muted);line-height:1.5;overflow-wrap:anywhere}
+
+#north-options{margin:0 0 20px}#north-options summary{cursor:pointer;font-size:14px;font-weight:600}#north-selectors{margin-top:14px}#north-selectors select{min-height:38px;font-size:14px;padding:6px 10px}

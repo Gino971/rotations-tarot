@@ -34,6 +34,7 @@
         <div id="excluded-field" hidden><div id="exclusion-selectors" class="exclusion-grid"></div></div>
         <div id="movement-info" class="movement-info" role="status"></div>
         <fieldset class="draw-field"><legend>Première manche</legend>
+          <details id="north-options"><summary>Attribuer les places Nord (facultatif)</summary><div id="north-selectors" class="field-grid"></div></details>
           <div class="draw-actions"><button id="draw" type="button" class="primary action-icon" aria-label="Tirer au sort" title="Tirer au sort"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 4 12 8-12 8Z" fill="currentColor" stroke="none"/></svg><span class="action-label" id="draw-label">Tirer au sort</span></button><button id="draw-sound" type="button" class="sound-toggle secondary" aria-pressed="true" aria-label="Couper le son du tirage" title="Couper le son"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 6.5 6.8 9.5H4.5v5h2.3l3.7 3V6.5Z"/><g class="sound-waves"><path d="M14 9a4.3 4.3 0 0 1 0 6M17 6.5a7.8 7.8 0 0 1 0 11"/></g><path class="sound-slash" d="m14 9 6 6m0-6-6 6"/></svg><span class="action-label" id="draw-sound-label">Son actif</span></button><button id="reset-draw" type="button" class="secondary action-icon" aria-label="Réinitialiser" title="Réinitialiser"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span class="action-label">Réinitialiser</span></button></div>
           <div id="draw-result" class="draw-result" hidden><div id="draw-order" class="chip-grid"></div></div>
           <p id="draw-status" class="hint" hidden role="status"></p>
@@ -96,6 +97,6 @@
       <div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Annuler</button><button value="confirm" class="confirm-redraw">Refaire le tirage</button></div>
     </form>
   </dialog>
-  <script type="module" src="app.js?v=123"></script>
+  <script type="module" src="app.js?v=125"></script>
 </body>
 </html>
