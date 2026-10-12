@@ -146,7 +146,7 @@ test('draw groups match actual table sizes, including five and six players', () 
     assert.equal(sizes.reduce((sum, size) => sum + size, 0), count)
   }
   assert.deepEqual(drawGroupSizesFor(9, 'mixed'), [4, 5])
-  assert.throws(() => drawGroupSizesFor(11, 'mixed'))
+  assert.deepEqual(drawGroupSizesFor(11, 'mixed').sort(), [3,4,4])
   assert.deepEqual(drawGroupSizesFor(13, 'excluded', [7]), [4, 4, 4, 1])
 })
 

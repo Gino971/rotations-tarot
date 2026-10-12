@@ -36,7 +36,7 @@ test('standard rotations preserve the original movement engine', () => {
 test('mixed table exceptions and source movement limits', () => {
   assert.throws(() => createPlan(6, 4, 'mixed'))
   assert.deepEqual(createPlan(7, 4, 'mixed').rotations['Manche 1'].map(table => table.joueurs.length), [3, 4])
-  assert.throws(() => createPlan(11, 4, 'mixed'))
+  assert.deepEqual(createPlan(11, 4, 'mixed').rotations['Manche 1'].map(table => table.joueurs.length).sort(), [3,4,4])
   assert.equal(maxRounds(24, 'normal'), 5)
   assert.equal(maxRounds(32, 'normal'), 6)
   assert.throws(() => createPlan(24, 6, 'normal'))
@@ -135,11 +135,11 @@ test('a player may be excluded only once and conflicting later choices are clear
  test('mixed options state exact table counts and never seat six players', () => {
   for (let count = 5; count <= 100; count++) {
     const option = optionsFor(count).find(o => o.value === 'mixed')
-    if ([6,11].includes(count)) { assert.equal(option, undefined); continue }
+    if (count === 6) { assert.equal(option, undefined); continue }
     if (!option) continue
     const plan = createPlan(count, 1, 'mixed')
     const tables = plan.rotations['Manche 1']
     assert.ok(tables.every(t => t.joueurs.length <= 5))
-    if (count !== 7) assert.match(option.label, new RegExp(`^${tables.filter(t=>t.joueurs.length===5).length} tables? de 5`))
+    if (![7,11].includes(count)) assert.match(option.label, new RegExp(`^${tables.filter(t=>t.joueurs.length===5).length} tables? de 5`))
   }
 })
