@@ -1,5 +1,5 @@
-import { timerRemaining, timerText, adjustTimer } from './timer.js?v=127'
-import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, drawOrderWithNorth, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=127'
+import { timerRemaining, timerText, adjustTimer } from './timer.js?v=128'
+import { optionsFor, normalizeExclusions, maxRounds, movementDetails, createPlan, encountersFor, tableVisitsFor, drawSlotsFor, drawGroupSizesFor, positionsFor, seats, drawOrderWithNorth, exchangeAndRecalculate, applyRoundOrders } from './engine.js?v=128'
 
 const $ = id => document.getElementById(id)
 const storageKey = 'rotations-tarot-v1'

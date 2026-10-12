@@ -1,5 +1,5 @@
 import { calculRotationsRainbow, getMovementInfo } from './movements.js'
-import { optimizeRotations } from './optimizer.js?v=127'
+import { optimizeRotations } from './optimizer.js?v=128'
 
 export const seats = ['Nord', 'Sud', 'Est', 'Ouest', 'Exempt 1', 'Exempt 2']
 
@@ -12,7 +12,7 @@ export function optionsFor(count) {
   const fourTables = (count - fiveTables * 5) / 4
   return [
     { value: 'morts', label: `Ajouter ${missing} mort${missing > 1 ? 's' : ''}`, detail: `${Math.ceil(count / 4)} tables de 4, avec ${missing} place${missing > 1 ? 's' : ''} vide${missing > 1 ? 's' : ''} au Nord.`, disabled: !canPlaceMorts },
-    ...(count === 6 ? [] : [{ value: 'mixed', label: count === 11 ? '1 table de 3 et 2 tables de 4' : count === 7 ? '1 table de 3 et 1 table de 4' : `${fiveTables} table${fiveTables > 1 ? 's' : ''} de 5${fourTables > 0 ? ` et ${fourTables} table${fourTables > 1 ? 's' : ''} de 4` : ''}`, detail: 'Répartition sans table de 6.' }]),
+    ...([6, 7, 11].includes(count) ? [] : [{ value: 'mixed', label: `${fiveTables} table${fiveTables > 1 ? 's' : ''} de 5${fourTables > 0 ? ` et ${fourTables} table${fourTables > 1 ? 's' : ''} de 4` : ''}`, detail: 'Répartition sans table de 6.' }]),
     ...(count % 4 === 1 ? [{ value: 'excluded', label: 'Exclus 1ere manche', detail: 'Choisissez l’exclu de la première manche. Toutes les rotations sont préparées avec les autres joueurs.' }] : [])
   ]
 }
@@ -36,7 +36,6 @@ export function maxRounds(count, mode) {
     const active = initialPlayers(count, mode).slice(0, -1)
     return Object.keys(calculRotationsRainbow(active, 7)).length
   }
-  if (mode === 'mixed' && count === 11) return maxRounds(count, 'morts')
   if (mode === 'mixed' && count === 6) return 7
   const base = initialPlayers(count, mode)
   return Object.keys(calculRotationsRainbow(base, 7)).length
@@ -104,11 +103,6 @@ export function createPlan(count, rounds, mode, exclusions = [], optimized = tru
   if (!Number.isInteger(rounds) || rounds < 1 || rounds > limit) throw new Error(`Ce mouvement permet de 1 à ${limit} manches.`)
   if (!Array.isArray(exclusions)) throw new Error('Choisissez les exclus manche par manche.')
   if (manualOrder !== null && (!Array.isArray(manualOrder) || manualOrder.length !== count || new Set(manualOrder).size !== count || manualOrder.some(id => !Number.isInteger(id) || id < 1 || id > count))) throw new Error('Placement manuel invalide.')
-  if (mode === 'mixed' && count === 11) {
-    const plan = createPlan(count, rounds, 'morts', [], optimized, drawSeed, manualOrder)
-    for (const tables of Object.values(plan.rotations)) for (const table of tables) table.joueurs = table.joueurs.filter(player => player.id !== null)
-    return { ...plan, mode }
-  }
   const order = manualOrder === null ? drawOrder(count, drawSeed) : manualOrder
   const relabel = player => player.id === null ? player : { ...player, id: order[player.id - 1], nom: `Joueur ${order[player.id - 1]}` }
   let base = initialPlayers(count, mode)
